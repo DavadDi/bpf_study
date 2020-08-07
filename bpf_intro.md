@@ -1,6 +1,14 @@
-###### BPF 技术简介
+# BPF 技术简介
 
 [TOC]
+
+<img src="https://www.do1618.com/wp-content/uploads/2020/08/linux-bpf-book.jpeg" style="zoom:50%;" />
+
+由范老师和我翻译的图书 《Linux内核观测技术BPF》 已经在 jd 有售，欢迎有兴趣学习的选购。链接地址 [https://item.jd.com/72110825905.html](https://item.jd.com/72110825905.html)
+
+
+
+“eBPF 是我见过的 Linux 中最神奇的技术，没有之一，已成为 Linux 内核中顶级子模块，从 tcpdump 中用作网络包过滤的经典 cbpf，到成为通用 Linux 内核技术的 eBPF，已经完成华丽蜕变，为应用与神奇的内核打造了一座桥梁，在系统跟踪、观测、性能调优、安全和网络等领域发挥重要的角色。eBPF 为 Service Mesh 打造了具备 API 感知和安全高效的容器网络方案 Cilium，底层正是完全基于 eBPF 技术”
 
 ## 1. BPF 
 
@@ -527,3 +535,4 @@ build: ${BPFCODE.c} ${BPFLOADER}
 8. [BPF Documentation](https://www.infradead.org/~mchehab/kernel_docs/bpf/index.html)  [HOWTO interact with BPF subsystem](https://www.kernel.org/doc/html/latest/bpf/bpf_devel_QA.html#q-how-do-i-indicate-which-tree-bpf-vs-bpf-next-my-patch-should-be-applied-to)
 9. [Linux 内核 BPF 文档](https://www.infradead.org/~mchehab/kernel_docs/bpf/index.html)
 10. [Linux Extended BPF (eBPF) Tracing Tools](http://www.brendangregg.com/ebpf.html)  Brendan Gregg
+11. [性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service](https://mp.weixin.qq.com/s/3BQU9AYh1ScZ_1V17BJ4wg)
