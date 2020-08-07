@@ -383,7 +383,7 @@ ffff9fd7e8192000 22384 curl       100.66.100.185  63446 52.33.159.26    80    ES
 
 整体架构
 
-<img src="/Users/dwh0403/Documents/bpf_study/imgs/bcc-internals.png" style="zoom: 75%;" />
+<img src="imgs/bcc-internals.png" style="zoom: 75%;" />
 
 使用 BCC 编写的 Hello World 版本：
 
