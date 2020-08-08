@@ -1,13 +1,3 @@
----
-title: eBPF 技术简介
-date: 2020-08-07 22:21:00
-updated: 2020-08-07 22:21:00
-tags: [bpf, ebpf]
-categories:
-- bpf
-comments: true
----
-
 # eBPF 技术简介
 <img src="imgs/linux-bpf-book.jpeg" style="zoom:50%;" />
 
@@ -114,7 +104,7 @@ eBPF 相关的知名的开源项目包括但不限于以下：
 
 基于 Linux 系统的观测，eBPF 整体结构图如下：
 
-<img src="http://www.brendangregg.com/eBPF/linux_ebpf_internals.png" alt="ebpf-arch" style="zoom:50%;" />
+<img src="imgs/linux_ebpf_internals.png" alt="ebpf-arch" style="zoom:50%;" />
 
 图 5 eBPF 观测架构
 
