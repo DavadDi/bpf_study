@@ -9,7 +9,7 @@ comments: true
 ---
 
 # eBPF 技术简介
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/linux-bpf-book.jpeg" style="zoom:50%;" />
+<img src="imgs/linux-bpf-book.jpeg" style="zoom:50%;" />
 
 由范老师和我一起翻译的图书 《Linux内核观测技术BPF》 已经在 JD 上有现货，欢迎感兴趣 BPF 技术的同学选购。链接地址 [https://item.jd.com/72110825905.html](https://item.jd.com/72110825905.html)
 
@@ -49,7 +49,7 @@ $ tcpdump -d 'ip and tcp port 8080'
 
 BPF 工作在内核层，BPF 的架构图如下 [来自于bpf-usenix93]：
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/image-20200419215511484.png" style="zoom:50%;" />
+<img src="imgs/image-20200419215511484.png" style="zoom:50%;" />
 
 图 1 tcpdump 运行架构 
 
@@ -77,13 +77,13 @@ eBPF 实现的最初目标是优化处理网络过滤器的内部 BPF 指令集�
 
 于此同时，eBPF 也逐渐在系统跟踪、观测、性能调优、安全和网络等领域发挥重要的角色。Facebook、NetFlix 、CloudFlare 等知名互联网公司内部广泛采用基于 eBPF 技术的各种程序用于性能分析、排查问题、负载均衡、防范 DDoS攻击，据相关信息显示在 Facebook 的机器上内置一系列 eBPF 的相关工具。
 
-![](https://www.do1618.com/wp-content/uploads/2020/08/bpf-basic-arch.png)
+![](imgs/bpf-basic-arch.png)
 
 图 0 BPF 架构图
 
 相对于系统的性能分析和观察，eBPF 技术在网络技术中的表现，更是让人眼前一亮，BPF 技术与 XDP（eXpress Data Path） 和 TC（Traffic Control） 组合可以实现功能更加强大的网络功能，更可为 SDN 软件定义网络提供基础支撑。XDP 只作用与网络包的 Ingress 层面，BPF 钩子位于**网络驱动中尽可能早的位置**，**无需进行原始包的复制**就可以实现最佳的数据包处理性能，挂载的 BPF 程序是运行过滤的理想选择，可用于丢弃恶意或非预期的流量、进行 DDOS 攻击保护等场景；而 TC Ingress 比 XDP 技术处于更高层次的位置，BPF 程序在 L3 层之前运行，可以访问到与数据包相关的大部分元数据，是本地节点处理的理想的地方，可以用于流量监控或者 L3/L4 的端点策略控制，同时配合 TC egress 则可实现对于容器环境下更高维度和级别的网络结构。
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/packet-processor-xdp.png" alt="packet-processor-xdp.png" style="zoom:75%;" />
+<img src="imgs/packet-processor-xdp.png" alt="packet-processor-xdp.png" style="zoom:75%;" />
 
 图 2 XDP 技术架构
 
@@ -98,7 +98,7 @@ eBPF 相关的知名的开源项目包括但不限于以下：
 
 越来越多的基于 eBPF 的项目如雨后脆笋一样开始蓬勃发展，而且逐步在社区中异军突起，成为一道风景线。比如 IO Visor 项目的 BCC 工具，为性能分析和观察提供了更加丰富的工具集：[图片来源](https://github.com/iovisor/bcc)
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/bcc-tools.png" alt="image-20200423080103673" style="zoom:50%;" />
+<img src="imgs/bcc-tools.png" alt="image-20200423080103673" style="zoom:50%;" />
 
 图 3 Linux bcc/BPF 观测工具
 
@@ -106,7 +106,7 @@ eBPF 相关的知名的开源项目包括但不限于以下：
 
 >  由于 eBPF 还在快速发展期，内核中的功能也日趋增强，一般推荐基于Linux 4.4+ (4.9 以上会更好) 内核的来使用 eBPF。部分 Linux Event 和 BPF 版本支持见下图：
 >
->  <img src="https://www.do1618.com/wp-content/uploads/2020/08/linux_kernel_event_bpf.png" alt="linux_kernel_bpf" style="zoom:50%;" />
+>  <img src="imgs/linux_kernel_event_bpf.png" alt="linux_kernel_bpf" style="zoom:50%;" />
 >
 >  图 4 Linux 事件和 BPF 版本支持
 
@@ -227,7 +227,7 @@ top
 
 **60s 系列 BPF 版本如下：**
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/ebpf_60s.png" alt="ebpf_60s" style="zoom:50%;" />
+<img src="imgs/ebpf_60s.png" alt="ebpf_60s" style="zoom:50%;" />
 
 图 6 60s 排查之 BPF 版本
 
@@ -329,7 +329,7 @@ $ cd FlameGraph
 $ ./flamegraph.pl --color=java < ../out.stacks01 > out.svg
 ```
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/flame.png" alt="image-20200806194324643" style="zoom: 67%;" />
+<img src="imgs/flame.png" alt="image-20200806194324643" style="zoom: 67%;" />
 
 图 7 火焰图
 
@@ -415,7 +415,7 @@ ffff9fd7e8192000 22384 curl       100.66.100.185  63446 52.33.159.26    80    ES
 
 ### 4.1 BCC 版本 HelloWorld
 
-<img src="https://www.do1618.com/wp-content/uploads/2020/08/bcc-internals.png" style="zoom: 75%;" />
+<img src="imgs/bcc-internals.png" style="zoom: 75%;" />
 
 图 8 BCC 整体架构
 
