@@ -1,3 +1,13 @@
+---
+title: eBPF 技术简介
+date: 2020-08-07 22:21:00
+updated: 2020-08-07 22:21:00
+tags: [bpf, ebpf]
+categories:
+- bpf
+comments: true
+---
+
 # eBPF 技术简介
 <img src="imgs/linux-bpf-book.jpeg" style="zoom:50%;" />
 
@@ -35,49 +45,54 @@ $ tcpdump -d 'ip and tcp port 8080'
 (012) ret      #0
 ```
 
-图 1  tcpdump 底层汇编指令
+图 1-1  tcpdump 底层汇编指令
 
 BPF 工作在内核层，BPF 的架构图如下 [来自于bpf-usenix93]：
 
 <img src="imgs/image-20200419215511484.png" style="zoom:50%;" />
 
-图 1 tcpdump 运行架构 
+图 1-2 tcpdump 运行架构 
 
 ## 2. eBPF
 
 ### 2.1 eBPF 介绍
 
-2014 年初，Alexei Starovoitov 实现了 eBPF（extended Berkeley Packet Filter）。eBPF 最早出现在 3.18 内核中，此后原来的 BPF 就被称为经典 BPF，缩写 cBPF（classic BPF），cBPF 现在已经基本废弃。现在，Linux 内核只运行 eBPF，内核会将加载的 cBPF 字节码透明地转换成 eBPF 再执行。
+2014 年初，Alexei Starovoitov 实现了 eBPF（extended Berkeley Packet Filter）。经过重新设计，eBPF 演进为一个通用执行引擎，可基于此开发性能分析工具、软件定义网络等诸多场景。eBPF 最早出现在 3.18 内核中，此后原来的 BPF 就被称为经典 BPF，缩写 cBPF（classic BPF），cBPF 现在已经基本废弃。现在，Linux 内核只运行 eBPF，内核会将加载的 cBPF 字节码透明地转换成 eBPF 再执行。
 
 eBPF 新的设计针对现代硬件进行了优化，所以 eBPF 生成的指令集比旧的 BPF 解释器生成的机器码执行得更快。扩展版本也增加了虚拟机中的寄存器数量，将原有的 2 个 32 位寄存器增加到 10 个 64 位寄存器。由于寄存器数量和宽度的增加，开发人员可以使用函数参数自由交换更多的信息，编写更复杂的程序。总之，这些改进使 eBPF 版本的速度比原来的 BPF 提高了 4 倍。
 
-| 维度           | cBPF                      | eBPF                                       |
-| -------------- | ------------------------- | ------------------------------------------ |
-| 寄存器数目     | 2个：A, X                 | 10个： R0–R9, 另外 R10 是一个只读的帧指针  |
-| 寄存器宽度     | 32位                      | 64位                                       |
-| 存储           | 16 个内存位: M[0–15]      | 512 字节堆栈，无限制大小的 “map” 存储      |
-| 限制的内核调用 | 非常有限，仅限于 JIT 特定 | 有限，通过 bpf_call 指令调用               |
-| 目标事件       | 数据包、 seccomp-BPF      | 数据包、内核函数、用户函数、跟踪点 PMCs 等 |
+| 维度           | cBPF                      | eBPF                                                         |
+| -------------- | ------------------------- | ------------------------------------------------------------ |
+| 内核版本       | Linux 2.1.75（1997年）    | Linux 3.18（2014年）[4.x for kprobe/uprobe/tracepoint/perf-event] |
+| 寄存器数目     | 2个：A, X                 | 10个： R0–R9, 另外 R10 是一个只读的帧指针                    |
+| 寄存器宽度     | 32位                      | 64位                                                         |
+| 存储           | 16 个内存位: M[0–15]      | 512 字节堆栈，无限制大小的 “map” 存储                        |
+| 限制的内核调用 | 非常有限，仅限于 JIT 特定 | 有限，通过 bpf_call 指令调用                                 |
+| 目标事件       | 数据包、 seccomp-BPF      | 数据包、内核函数、用户函数、跟踪点 PMCs 等                   |
 
 表格 1 cBPF 与 eBPF 对比
+
+> eBPF 在 Linux 3.18 版本以后引入，并不代表只能在内核 3.18+ 版本上运行，低版本的内核升级到最新也可以使用 eBPF 能力，只是可能部分功能受限，比如我就是在 Linux 发行版本 CentOS Linux release 7.7.1908 内核版本 3.10.0-1062.9.1.el7.x86_64 上运行 eBPF 在生产环境上搜集和排查网络问题。
 
 eBPF 实现的最初目标是优化处理网络过滤器的内部 BPF 指令集。当时，BPF 程序仍然限于内核空间使用，只有少数用户空间程序可以编写内核处理的 BPF 过滤器，例如：tcpdump和 seccomp。时至今日，这些程序仍基于旧的 BPF 解释器生成字节码，但内核中会将这些指令转换为高性能的内部表示。                                 
 
 2014 年 6 月，**eBPF 扩展到用户空间，这也成为了 BPF 技术的转折点**。 正如 Alexei 在提交补丁的注释中写到：“这个补丁展示了 eBPF 的潜力”。当前，eBPF 不再局限于网络栈，已经成为内核顶级的子系统。eBPF 程序架构强调安全性和稳定性，看上去更像内核模块，但与内核模块不同，eBPF 程序不需要重新编译内核，并且可以确保 eBPF 程序运行完成，而不会造成系统的崩溃。
 
-于此同时，eBPF 也逐渐在系统跟踪、观测、性能调优、安全和网络等领域发挥重要的角色。Facebook、NetFlix 、CloudFlare 等知名互联网公司内部广泛采用基于 eBPF 技术的各种程序用于性能分析、排查问题、负载均衡、防范 DDoS攻击，据相关信息显示在 Facebook 的机器上内置一系列 eBPF 的相关工具。
-
 ![](imgs/bpf-basic-arch.png)
 
-图 0 BPF 架构图
+图 2-1 BPF 架构图
 
-相对于系统的性能分析和观察，eBPF 技术在网络技术中的表现，更是让人眼前一亮，BPF 技术与 XDP（eXpress Data Path） 和 TC（Traffic Control） 组合可以实现功能更加强大的网络功能，更可为 SDN 软件定义网络提供基础支撑。XDP 只作用与网络包的 Ingress 层面，BPF 钩子位于**网络驱动中尽可能早的位置**，**无需进行原始包的复制**就可以实现最佳的数据包处理性能，挂载的 BPF 程序是运行过滤的理想选择，可用于丢弃恶意或非预期的流量、进行 DDOS 攻击保护等场景；而 TC Ingress 比 XDP 技术处于更高层次的位置，BPF 程序在 L3 层之前运行，可以访问到与数据包相关的大部分元数据，是本地节点处理的理想的地方，可以用于流量监控或者 L3/L4 的端点策略控制，同时配合 TC egress 则可实现对于容器环境下更高维度和级别的网络结构。
+简述概括， eBPF 是一套通用执行引擎，提供了可基于系统或程序事件高效安全执行特定代码的通用能力，通用能力的使用者不再局限于内核开发者；eBPF 可由执行字节码指令、存储对象和 Helper 帮助函数组成，字节码指令在内核执行前必须通过 BPF 验证器 Verfier 的验证，同时在启用 BPF JIT 模式的内核中，会直接将字节码指令转成内核可执行的本地指令运行。
+
+
+
+同时，eBPF 也逐渐在观测（跟踪、性能调优等）、安全和网络等领域发挥重要的角色。Facebook、NetFlix 、CloudFlare 等知名互联网公司内部广泛采用基于 eBPF 技术的各种程序用于性能分析、排查问题、负载均衡、防范 DDoS 攻击，据相关信息显示在 Facebook 的机器上内置一系列 eBPF 的相关工具。
+
+相对于系统的性能分析和观测，eBPF 技术在网络技术中的表现，更是让人眼前一亮，BPF 技术与 XDP（eXpress Data Path） 和 TC（Traffic Control） 组合可以实现功能更加强大的网络功能，更可为 SDN 软件定义网络提供基础支撑。XDP 只作用与网络包的 Ingress 层面，BPF 钩子位于**网络驱动中尽可能早的位置**，**无需进行原始包的复制**就可以实现最佳的数据包处理性能，挂载的 BPF 程序是运行过滤的理想选择，可用于丢弃恶意或非预期的流量、进行 DDOS 攻击保护等场景；而 TC Ingress 比 XDP 技术处于更高层次的位置，BPF 程序在 L3 层之前运行，可以访问到与数据包相关的大部分元数据，是本地节点处理的理想的地方，可以用于流量监控或者 L3/L4 的端点策略控制，同时配合 TC egress 则可实现对于容器环境下更高维度和级别的网络结构。
 
 <img src="imgs/packet-processor-xdp.png" alt="packet-processor-xdp.png" style="zoom:75%;" />
 
-图 2 XDP 技术架构
-
-
+图 2-2 XDP 技术架构
 
 eBPF 相关的知名的开源项目包括但不限于以下：
 
@@ -90,7 +105,7 @@ eBPF 相关的知名的开源项目包括但不限于以下：
 
 <img src="imgs/bcc-tools.png" alt="image-20200423080103673" style="zoom:50%;" />
 
-图 3 Linux bcc/BPF 观测工具
+图 2-3 Linux bcc/BPF 观测工具
 
 同时，IO Visor 的 [bpf-docs](https://github.com/iovisor/bpf-docs) 包含了日常的文档，可以用于学习。
 
@@ -98,15 +113,17 @@ eBPF 相关的知名的开源项目包括但不限于以下：
 >
 >  <img src="imgs/linux_kernel_event_bpf.png" alt="linux_kernel_bpf" style="zoom:50%;" />
 >
->  图 4 Linux 事件和 BPF 版本支持
+>  图 2-4 Linux 事件和 BPF 版本支持
 
 ### 2.2 eBPF 架构（观测）
 
-基于 Linux 系统的观测，eBPF 整体结构图如下：
+基于 Linux 系统的观测工具中，eBPF 有着得天独厚的优势，高效、生产安全且内核中内置，特别的可以在内核中完成数据分析聚合比如直方图，与将数据发送到用户空间分析聚合相比，能够节省大量的数据复制传递带来的 CPU 消耗。
+
+eBPF 整体结构图如下：
 
 <img src="imgs/linux_ebpf_internals.png" alt="ebpf-arch" style="zoom:50%;" />
 
-图 5 eBPF 观测架构
+图 2-5 eBPF 观测架构
 
 eBPF 分为用户空间程序和内核程序两部分：
 
@@ -133,9 +150,11 @@ eBPF 分为用户空间程序和内核程序两部分：
 
 eBPF 技术虽然强大，但是为了保证内核的处理安全和及时响应，内核中的 eBPF 技术也给予了诸多限制，当然随着技术的发展和演进，限制也在逐步放宽或者提供了对应的解决方案。
 
-* eBPF 程序不能调用任意的内核参数，只限于内核模块中列出的 BPF Helper 函数，函数支持列表也随着内核的演进在不断增加；（添加个数说明）
+* eBPF 程序不能调用任意的内核参数，只限于内核模块中列出的 BPF Helper 函数，函数支持列表也随着内核的演进在不断增加。（todo 添加个数说明）
 
-* eBPF 程序中循环次数限制，这主要是用来防止在 kprobes 中插入任意的循环，导致锁住整个系统；解决办法包括展开循环，并为需要循环的常见用途添加辅助函数。Linux 5.3 在 BPF 中包含了对有界循环的支持，它有一个可验证的运行时间上限；
+* eBPF 程序不允许包含无法到达的指令，防止加载无效代码，延迟程序的终止。
+
+* eBPF 程序中循环次数限制且必须在有限时间内结束，这主要是用来防止在 kprobes 中插入任意的循环，导致锁住整个系统；解决办法包括展开循环，并为需要循环的常见用途添加辅助函数。Linux 5.3 在 BPF 中包含了对有界循环的支持，它有一个可验证的运行时间上限。
 
 * eBPF 堆栈大小被限制在 MAX_BPF_STACK，截止到内核 Linux 5.8 版本，被设置为 512；参见 [include/linux/filter.h](https://github.com/torvalds/linux/blob/v5.8/include/linux/filter.h)，这个限制特别是在栈上存储多个字符串缓冲区时：一个char[256]缓冲区会消耗这个栈的一半。目前没有计划增加这个限制，解决方法是改用 bpf 映射存储，它实际上是无限的。
 
@@ -151,21 +170,22 @@ eBPF 技术虽然强大，但是为了保证内核的处理安全和及时响应
   ```
 
 
-
-
 ### 2.4 eBPF 与内核模块对比
 
 在 Linux 观测方面，eBPF 总是会拿来与 kernel 模块方式进行对比，eBPF 在安全性、入门门槛上比内核模块都有优势，这两点在观测场景下对于用户来讲尤其重要。
 
-| 维度                | Linux 内核模块                   | eBPF                                         |
-| ------------------- | -------------------------------- | -------------------------------------------- |
-| kprobes/tracepoints | 支持                             | 支持                                         |
-| **安全性**          | 可能引入安全漏洞或导致内核 Panic | 通过验证器进行检查，可以保障内核安全         |
-| 编译性              | 需要编译内核                     | 不需要编译内核，引入头文件即可               |
-| 运行                | 基于相同内核运行                 | 基于稳定ABI的 BPF 程序可以编译一次，各处运行 |
-| 与应用程序交互      | 打印日志或文件                   | 通过基于 perf_event map 结构                 |
-| 数据结构丰富性      | 一般                             | 丰富                                         |
-| **入门门槛**        | 高                               | 低                                           |
+| 维度                | Linux 内核模块                       | eBPF                                           |
+| ------------------- | ------------------------------------ | ---------------------------------------------- |
+| kprobes/tracepoints | 支持                                 | 支持                                           |
+| **安全性**          | 可能引入安全漏洞或导致内核 Panic     | 通过验证器进行检查，可以保障内核安全           |
+| 内核函数            | 可以调用内核函数                     | 只能通过 BPF Helper 函数调用                   |
+| 编译性              | 需要编译内核                         | 不需要编译内核，引入头文件即可                 |
+| 运行                | 基于相同内核运行                     | 基于稳定 ABI 的 BPF 程序可以编译一次，各处运行 |
+| 与应用程序交互      | 打印日志或文件                       | 通过 perf_event 或 map 结构                    |
+| 数据结构丰富性      | 一般                                 | 丰富                                           |
+| **入门门槛**        | 高                                   | 低                                             |
+| **升级**            | 需要卸载和加载，可能导致处理流程中断 | 原子替换升级，不会造成处理流程中断             |
+| 内核内置            | 视情况而定                           | 内核内置支持                                   |
 
 表格 2 eBPF 与 Linux 内核模块方式对比
 
@@ -219,7 +239,7 @@ top
 
 <img src="imgs/ebpf_60s.png" alt="ebpf_60s" style="zoom:50%;" />
 
-图 6 60s 排查之 BPF 版本
+图 3-1 60s 排查之 BPF 版本
 
 对于在系统中运行的 "闪电侠" 程序，运行周期非常短，但是可能会带来系统的抖动延时，我们采用 `top` 命令查看一般情况下难以发现，我们可以使用 BCC 提供的工具 `execsnoop ` 来进行排查：
 
@@ -321,7 +341,7 @@ $ ./flamegraph.pl --color=java < ../out.stacks01 > out.svg
 
 <img src="imgs/flame.png" alt="image-20200806194324643" style="zoom: 67%;" />
 
-图 7 火焰图
+图 3-2 火焰图
 
 ### 3.3 排查网络调用来源
 
@@ -407,7 +427,7 @@ ffff9fd7e8192000 22384 curl       100.66.100.185  63446 52.33.159.26    80    ES
 
 <img src="imgs/bcc-internals.png" style="zoom: 75%;" />
 
-图 8 BCC 整体架构
+图 4-1 BCC 整体架构
 
 使用 BCC 前端绑定语言 Python 编写的 Hello World 版本：
 
@@ -540,15 +560,48 @@ build: ${BPFCODE.c} ${BPFLOADER}
 ## 5. 参考资料
 
 1. [The BSD Packet Filter: A New Architecture for User-level Packet Capture](https://www.tcpdump.org/papers/bpf-usenix93.pdf)
+
 2. [[译] Cilium：BPF 和 XDP 参考指南（2019） ](http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/)   [Cillum BPF and XDP Reference Guide](https://docs.cilium.io/en/v1.8/bpf/)
+
 3. [Cloudflare架构以及BPF如何占据世界](https://blog.cloudflare.com/zh/cloudflare-architecture-and-how-bpf-eats-the-world-zh/)
+
 4. [關於 BPF 和 eBPF 的筆記](https://www.luoow.com/dc_tw/106805603)
+
 5. [Dive into BPF: a list of reading material](https://qmonnet.github.io/whirl-offload/2016/09/01/dive-into-bpf/)  [中文](https://blog.csdn.net/F8qG7f9YD02Pe/article/details/79815702)
+
 6. [eBPF 简史](https://www.ibm.com/developerworks/cn/linux/l-lo-eBPF-history/index.html)
+
 7. https://www.youtube.com/watch?v=znBGt7oHJyQ
+
 8. [BPF Documentation](https://www.infradead.org/~mchehab/kernel_docs/bpf/index.html)  [HOWTO interact with BPF subsystem](https://www.kernel.org/doc/html/latest/bpf/bpf_devel_QA.html#q-how-do-i-indicate-which-tree-bpf-vs-bpf-next-my-patch-should-be-applied-to)
+
 9. [Linux 内核 BPF 文档](https://www.infradead.org/~mchehab/kernel_docs/bpf/index.html)
+
 10. [Linux Extended BPF (eBPF) Tracing Tools](http://www.brendangregg.com/ebpf.html)  Brendan Gregg
+
 11. [性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service](https://mp.weixin.qq.com/s/3BQU9AYh1ScZ_1V17BJ4wg)
+
 12. [SDN handbook](https://tonydeng.github.io/sdn-handbook/)
+
+13. Linux BPF 帮助文档 [bpf(2)](https://man7.org/linux/man-pages/man2/bpf.2.html)  [bpf-helpers(7)](https://man7.org/linux/man-pages/man7/bpf-helpers.7.html)  [tc-bpf(8)](https://man7.org/linux/man-pages/man8/tc-bpf.8.html) 
+
+    > 1. user commands
+    >
+    > 2. system calls
+    >
+    > 3. library functions
+    >
+    > 4. special files
+    >
+    > 5. file formats and filesystems
+    >
+    > 6. games
+    >
+    > 7. overview and miscellany section
+    >
+    > 8. administration and privileged commands
+    >
+    > 参考：https://man7.org/linux/man-pages/index.html
+
+14. todo
 
