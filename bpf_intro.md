@@ -555,9 +555,23 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 完整的程序参见：[hello_world](https://github.com/DavadDi/linux-observability-with-bpf/tree/master/code/chapter-2/hello_world)；更多的样例代码可以参见对应内核中 `kernel-src/samples/bpf/` 下的样例代码。
 
+## 5. 国内大厂 eBPF 实践总结
 
+* [eBPF 在网易轻舟云原生的应用实践](https://www.infoq.cn/article/OVCVwQijztA7JlexgDOc)
 
-## 5. 参考资料
+* [性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service](https://mp.weixin.qq.com/s?__biz=MzI5ODQ2MzI3NQ==&mid=2247491111&idx=2&sn=db348d6f13e1df4b3b9aba2dce0ba0e4&chksm=eca42763dbd3ae757530f6922ca1748736e42eb863e01076e94622c81be542e5582c9678874b&scene=27#wechat_redirect)
+
+* [字节跳动：eBPF 技术实践：高性能 ACL](https://www.infoq.cn/article/Tc5Bugo5vBAkyaRb5CCU)
+
+* [阿里：eBPF Internal：Instructions and Runtime](https://www.infoq.cn/article/c6t2IL23O6EbdQgUpQhb)
+
+* [使用 ebpf 深入分析容器网络 dup 包问题](https://mp.weixin.qq.com/s?__biz=MzI5ODQ2MzI3NQ==&mid=2247488831&idx=1&sn=3da3a976439d0134e3789a3e035ea1f0&chksm=eca42c7bdbd3a56d35c482d07798ee9d48a2f1103724f78f0634953ab33d8bd1ab9700190fb6&scene=27#wechat_redirect)
+
+* [eBay 云计算“网”事：网络超时篇](https://www.infoq.cn/article/JmCbkA0XX9NqrcX6loIo)
+
+* [字节跳动容器化场景下的性能优化实践](https://www.infoq.cn/article/mu-1bFHNmrdd0kybgPXx)
+
+## 6. 参考资料
 
 1. [The BSD Packet Filter: A New Architecture for User-level Packet Capture](https://www.tcpdump.org/papers/bpf-usenix93.pdf)
 
