@@ -571,6 +571,8 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 * [字节跳动容器化场景下的性能优化实践](https://www.infoq.cn/article/mu-1bFHNmrdd0kybgPXx)
 
+* [PingCAP Libbpf-tools —— 让 Tracing 工具身轻如燕](https://mp.weixin.qq.com/s/-3QRMu1aQbGxaF_JQY353w)
+
 ## 6. 参考资料
 
 1. [The BSD Packet Filter: A New Architecture for User-level Packet Capture](https://www.tcpdump.org/papers/bpf-usenix93.pdf)
