@@ -570,7 +570,9 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 ## 6. 国外公司 eBPF 实践
 
-* [sysdig Sysdig and Falco now powered by eBPF](https://sysdig.com/blog/sysdig-and-falco-now-powered-by-ebpf/)   & [The art of writing eBPF programs: a primer](https://sysdig.com/blog/the-art-of-writing-ebpf-programs-a-primer/)
+* [sysdig Sysdig and Falco now powered by eBPF](https://sysdig.com/blog/sysdig-and-falco-now-powered-by-ebpf/)   &&   [The art of writing eBPF programs: a primer](https://sysdig.com/blog/the-art-of-writing-ebpf-programs-a-primer/)   [sysdig github](https://github.com/draios/sysdig/)  [Linux Install](https://github.com/draios/sysdig/wiki/How-to-Install-Sysdig-for-Linux)
+  * [使用 sysdig 进行监控和调试 linux 机器](https://cizixs.com/2017/04/27/sysdig-for-linux-system-monitor-and-analysis/)
+  * [Sysdig for ps, lsof, netstat + time travel.](https://sysdig.com/blog/ps-lsof-netstat-time-travel/)
 
 ## 参考资料
 
