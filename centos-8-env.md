@@ -29,5 +29,14 @@ end
 $ vagrant init centos/8 \
   --box-version 1905.1
 $ vagrant up
+
+# yum update -y
+...
+Installed:
+  kernel-4.18.0-193.14.2.el8_2.x86_64     kernel-core-4.18.0-193.14.2.el8_2.x86_64       kernel-modules-4.18.0-193.14.2.el8_2.x86_64
+  yum-utils-4.0.12-3.el8.noarch           elfutils-debuginfod-client-0.178-7.el8.x86_64  centos-gpg-keys-8.2-2.2004.0.1.el8.noarch
+  centos-repos-8.2-2.2004.0.1.el8.x86_64  grub2-tools-efi-1:2.02-87.el8_2.x86_64         libssh-config-0.9.0-4.el8.noarch
+  libzstd-1.4.2-2.el8.x86_64              mozjs60-60.9.0-4.el8.x86_64                    python3-nftables-1:0.9.3-12.el8.x86_64
+  python3-pip-wheel-9.0.3-16.el8.noarch   python3-setuptools-wheel-39.2.0-5.el8.noarch
 ```
 

@@ -625,3 +625,18 @@ build: ${BPFCODE.c} ${BPFLOADER}
     > 参考：https://man7.org/linux/man-pages/index.html
 
 16. https://ebpf.io/
+
+17. Oracle Blog 系列教程 
+    * [BPF program types](http://blogs.oracle.com/linux/notes-on-bpf-1)  
+    * [BPF helper functions for those programs](http://blogs.oracle.com/linux/notes-on-bpf-2) 
+    * [BPF userspace communication](http://blogs.oracle.com/linux/notes-on-bpf-3) 
+    * [BPF program build environment](http://blogs.oracle.com/linux/notes-on-bpf-4) 
+    * [BPF bytecodes and verifier](http://blogs.oracle.com/linux/notes-on-bpf-5)
+    * [BPF Packet Transformation](http://blogs.oracle.com/linux/notes-on-bpf-6)
+
+18. 华为内核分享系列 
+
+    * [Linux内核发展史 (1)](https://www.cnblogs.com/huaweicloud/p/12384872.html)
+    * [Linux内核发展史 (2)](https://www.cnblogs.com/huaweicloud/p/12229625.html)
+    * [Linux内核发展史 (3)](https://www.cnblogs.com/huaweicloud/p/12383569.html)
+    * [Linux内核源码结构（1）](https://www.cnblogs.com/huaweicloud/p/12383792.html)
