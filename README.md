@@ -634,7 +634,7 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [BPF bytecodes and verifier](http://blogs.oracle.com/linux/notes-on-bpf-5)
     * [BPF Packet Transformation](http://blogs.oracle.com/linux/notes-on-bpf-6)
     * [The Power of XDP](https://blogs.oracle.com/linux/the-power-of-xdp)
-* [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
+    * [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
     * [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
     
 18. 华为内核分享系列 
