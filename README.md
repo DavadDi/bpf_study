@@ -633,7 +633,10 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [BPF program build environment](http://blogs.oracle.com/linux/notes-on-bpf-4) 
     * [BPF bytecodes and verifier](http://blogs.oracle.com/linux/notes-on-bpf-5)
     * [BPF Packet Transformation](http://blogs.oracle.com/linux/notes-on-bpf-6)
-
+    * [The Power of XDP](https://blogs.oracle.com/linux/the-power-of-xdp)
+* [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
+    * [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
+    
 18. 华为内核分享系列 
 
     * [Linux内核发展史 (1)](https://www.cnblogs.com/huaweicloud/p/12384872.html)
