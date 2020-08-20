@@ -573,6 +573,10 @@ build: ${BPFCODE.c} ${BPFLOADER}
 * [sysdig Sysdig and Falco now powered by eBPF](https://sysdig.com/blog/sysdig-and-falco-now-powered-by-ebpf/)   &&   [The art of writing eBPF programs: a primer](https://sysdig.com/blog/the-art-of-writing-ebpf-programs-a-primer/)   [sysdig github](https://github.com/draios/sysdig/)  [Linux Install](https://github.com/draios/sysdig/wiki/How-to-Install-Sysdig-for-Linux)
   * [使用 sysdig 进行监控和调试 linux 机器](https://cizixs.com/2017/04/27/sysdig-for-linux-system-monitor-and-analysis/)
   * [Sysdig for ps, lsof, netstat + time travel.](https://sysdig.com/blog/ps-lsof-netstat-time-travel/)
+* [Datadog-Agent](https://github.com/DataDog/datadog-agent/)
+  * [kube-netc](https://github.com/nirmata/kube-netc)    [kube-netc: simplified network observability for Kubernetes](https://medium.com/@drewrip/kube-netc-simplified-network-observability-for-kubernetes-b507dba6a1bb)  依赖于 DataDog Agent 中的 ebpf
+  * [Introducing Datadog Network Performance Monitoring](https://www.datadoghq.com/blog/network-performance-monitoring/)
+  * [weaveworks tcptracer-bpf](https://github.com/weaveworks/tcptracer-bpf)  基础依赖
 
 ## 参考资料
 
