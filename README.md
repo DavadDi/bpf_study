@@ -630,7 +630,11 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 16. https://ebpf.io/
 
-17. Oracle Blog 系列教程 
+17. [kernel bpf](https://www.kernel.org/doc/html/latest/bpf/index.html)
+
+18. [online kernel](https://elixir.bootlin.com/linux/v5.8/)
+
+19. Oracle Blog 系列教程 
     * [BPF program types](http://blogs.oracle.com/linux/notes-on-bpf-1)  
     * [BPF helper functions for those programs](http://blogs.oracle.com/linux/notes-on-bpf-2) 
     * [BPF userspace communication](http://blogs.oracle.com/linux/notes-on-bpf-3) 
@@ -640,8 +644,8 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [The Power of XDP](https://blogs.oracle.com/linux/the-power-of-xdp)
     * [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
     * [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
-    
-18. 华为内核分享系列 
+
+20. 华为内核分享系列 
 
     * [Linux内核发展史 (1)](https://www.cnblogs.com/huaweicloud/p/12384872.html)
     * [Linux内核发展史 (2)](https://www.cnblogs.com/huaweicloud/p/12229625.html)
