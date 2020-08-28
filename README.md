@@ -578,6 +578,15 @@ build: ${BPFCODE.c} ${BPFLOADER}
   * [Introducing Datadog Network Performance Monitoring](https://www.datadoghq.com/blog/network-performance-monitoring/)
   * [weaveworks tcptracer-bpf](https://github.com/weaveworks/tcptracer-bpf)  基础依赖
 
+## 7. 友情链接区
+
+* [全面介绍eBPF-概念](https://www.cnblogs.com/charlieroro/p/13403672.html)
+* [大卫李](https://davidlovezoe.club/wordpress/)
+* [Linux 内核之旅](http://kerneltravel.net/categories/ebpf/)
+* [实现一个基于XDP_eBPF的学习型网桥](http://news.eeworld.com.cn/mp/ymc/a76089.jspx)
+* [eBPF Up & Running: Overview](https://rpi.werls.top/index.php/2020/07/11/ebpf-up-running-overview/)
+* [github awesome-ebpf](https://github.com/zoidbergwill/awesome-ebpf)
+
 ## 参考资料
 
 1. [The BSD Packet Filter: A New Architecture for User-level Packet Capture](https://www.tcpdump.org/papers/bpf-usenix93.pdf)
@@ -630,11 +639,13 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 16. https://ebpf.io/
 
-17. [kernel bpf](https://www.kernel.org/doc/html/latest/bpf/index.html)
+17. [kernel bpf](https://www.kernel.org/doc/html/latest/bpf/index.html)  
 
-18. [online kernel](https://elixir.bootlin.com/linux/v5.8/)
+18. [eBPF features by Linux version](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md)
 
-19. Oracle Blog 系列教程 
+19. [online kernel](https://elixir.bootlin.com/linux/v5.8/)
+
+20. Oracle Blog 系列教程 
     * [BPF program types](http://blogs.oracle.com/linux/notes-on-bpf-1)  
     * [BPF helper functions for those programs](http://blogs.oracle.com/linux/notes-on-bpf-2) 
     * [BPF userspace communication](http://blogs.oracle.com/linux/notes-on-bpf-3) 
@@ -645,9 +656,11 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
     * [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
 
-20. 华为内核分享系列 
+21. 华为内核分享系列 
 
     * [Linux内核发展史 (1)](https://www.cnblogs.com/huaweicloud/p/12384872.html)
     * [Linux内核发展史 (2)](https://www.cnblogs.com/huaweicloud/p/12229625.html)
     * [Linux内核发展史 (3)](https://www.cnblogs.com/huaweicloud/p/12383569.html)
     * [Linux内核源码结构（1）](https://www.cnblogs.com/huaweicloud/p/12383792.html)
+    
+22. [NETWORK TRACING USING THE BPF COMPILER COLLECTION](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
