@@ -587,6 +587,8 @@ build: ${BPFCODE.c} ${BPFLOADER}
 * [eBPF Up & Running: Overview](https://rpi.werls.top/index.php/2020/07/11/ebpf-up-running-overview/)
 * [github awesome-ebpf](https://github.com/zoidbergwill/awesome-ebpf)
 * [浅谈Service Mesh体系中的Envoy](https://www.cnblogs.com/liuhongru/p/11413204.html)
+* [arthurchiao](http://arthurchiao.art/)
+* [实现一个基于XDP_eBPF的学习型网桥](https://mp.weixin.qq.com/s?__biz=MzAwMDUwNDgxOA==&mid=2652666474&idx=1&sn=d78dad0280470e661076ee3660c4eea9&chksm=810f3cf7b678b5e1a93f749fe9c5429cd87aef81c117649302176c16b12866f951df0c306496&scene=21#wechat_redirect) 和 [用Linux内核的瑞士军刀-eBPF实现socket转发offload](https://mp.weixin.qq.com/s/VL6oKW1m0PXmuuE1v8h0iw)
 
 ## 参考资料
 
