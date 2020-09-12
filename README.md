@@ -80,13 +80,35 @@ eBPF 实现的最初目标是优化处理网络过滤器的内部 BPF 指令集�
 
 2014 年 6 月，**eBPF 扩展到用户空间，这也成为了 BPF 技术的转折点**。 正如 Alexei 在提交补丁的注释中写到：“这个补丁展示了 eBPF 的潜力”。当前，eBPF 不再局限于网络栈，已经成为内核顶级的子系统。eBPF 程序架构强调安全性和稳定性，看上去更像内核模块，但与内核模块不同，eBPF 程序不需要重新编译内核，并且可以确保 eBPF 程序运行完成，而不会造成系统的崩溃。
 
+> BPF 相关的维护者：
+>
+> BPF (Safe dynamic programs and tools)：
+>
+> M:	Alexei Starovoitov <ast@kernel.org>
+> M:	Daniel Borkmann <daniel@iogearbox.net>
+>
+> XDP ：
+>
+> M:	Alexei Starovoitov <ast@kernel.org>
+> M:	Daniel Borkmann <daniel@iogearbox.net>
+> M:	David S. Miller <davem@davemloft.net>
+> M:	Jakub Kicinski <kuba@kernel.org>
+> M:	Jesper Dangaard Brouer <hawk@kernel.org>
+> M:	John Fastabend <john.fastabend@gmail.com>
+>
+> XDP SOCKETS (AF_XDP)
+> M:	BjÃ¶rn TÃ¶pel <bjorn.topel@intel.com>
+> M:	Magnus Karlsson <magnus.karlsson@intel.com>
+>
+> 网络部分的提交至 [David Miller](https://en.wikipedia.org/wiki/David_S._Miller) （Linux 网络内核系统主要维护者），由其提交至 [Linux Torvalds](https://github.com/torvalds/linux)
+>
+> 来自于：https://www.kernel.org/doc/linux/MAINTAINERS
+
 ![](imgs/bpf-basic-arch.png)
 
 图 2-1 BPF 架构图
 
 简述概括， eBPF 是一套通用执行引擎，提供了可基于系统或程序事件高效安全执行特定代码的通用能力，通用能力的使用者不再局限于内核开发者；eBPF 可由执行字节码指令、存储对象和 Helper 帮助函数组成，字节码指令在内核执行前必须通过 BPF 验证器 Verfier 的验证，同时在启用 BPF JIT 模式的内核中，会直接将字节码指令转成内核可执行的本地指令运行。
-
-
 
 同时，eBPF 也逐渐在观测（跟踪、性能调优等）、安全和网络等领域发挥重要的角色。Facebook、NetFlix 、CloudFlare 等知名互联网公司内部广泛采用基于 eBPF 技术的各种程序用于性能分析、排查问题、负载均衡、防范 DDoS 攻击，据相关信息显示在 Facebook 的机器上内置一系列 eBPF 的相关工具。
 
@@ -590,6 +612,13 @@ build: ${BPFCODE.c} ${BPFLOADER}
 * [arthurchiao](http://arthurchiao.art/)
 * [实现一个基于XDP_eBPF的学习型网桥](https://mp.weixin.qq.com/s?__biz=MzAwMDUwNDgxOA==&mid=2652666474&idx=1&sn=d78dad0280470e661076ee3660c4eea9&chksm=810f3cf7b678b5e1a93f749fe9c5429cd87aef81c117649302176c16b12866f951df0c306496&scene=21#wechat_redirect) 和 [用Linux内核的瑞士军刀-eBPF实现socket转发offload](https://mp.weixin.qq.com/s/VL6oKW1m0PXmuuE1v8h0iw)
 
+
+
+## 8. 内核中的源码
+
+* [kernel libbpf](https://github.com/torvalds/linux/tree/master/tools/lib/bpf) 
+* [独立仓库 libbpf](https://github.com/libbpf/libbpf) mirror from  [bpf-next](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/)
+
 ## 参考资料
 
 1. [The BSD Packet Filter: A New Architecture for User-level Packet Capture](https://www.tcpdump.org/papers/bpf-usenix93.pdf)
@@ -667,3 +696,5 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [Linux内核源码结构（1）](https://www.cnblogs.com/huaweicloud/p/12383792.html)
     
 22. [NETWORK TRACING USING THE BPF COMPILER COLLECTION](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
+
+23. bpf 归档的邮件列表 https://lore.kernel.org/bpf/， 完整列表 http://vger.kernel.org/vger-lists.html
