@@ -47,8 +47,6 @@ include/uapi/linux/bpf.h
  192 };
 ```
 
-
-
 程序在载入的过程中会根据 BPF 进行判断，`load_bpf_file` 用户程序用于加载的入口函数，`loader.c` 文件中加载 BPF 程序的使用样例如下：
 
 ```c
@@ -129,8 +127,6 @@ samples/bpf/bpf_load.h
  56 int bpf_set_link_xdp_fd(int ifindex, int fd, __u32 flags);
  57 #endif
 ```
-
-
 
 参见文件 samples/bpf/bpf_load.c 中的 `do_load_bpf_file` 函数：
 

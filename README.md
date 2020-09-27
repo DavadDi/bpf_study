@@ -688,13 +688,21 @@ build: ${BPFCODE.c} ${BPFLOADER}
     * [Notes on BPF (7) - BPF, tc and Generic Segmentation Offload](https://blogs.oracle.com/linux/notes-on-bpf-7)
     * [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
 
-21. 华为内核分享系列 
+21. An eBPF overview
+
+    * [part 1: Introduction](https://www.collabora.com/news-and-blog/blog/2019/04/05/an-ebpf-overview-part-1-introduction/)
+    * [part 2: Machine & bytecode](https://www.collabora.com/news-and-blog/blog/2019/04/15/an-ebpf-overview-part-2-machine-and-bytecode/)
+    * [part 3: Walking up the software stack](https://www.collabora.com/news-and-blog/blog/2019/04/26/an-ebpf-overview-part-3-walking-up-the-software-stack/)
+    * [part 4: Working with embedded systems](https://www.collabora.com/news-and-blog/blog/2019/05/06/an-ebpf-overview-part-4-working-with-embedded-systems/)
+    * [part 5: Tracing user processes](https://www.collabora.com/news-and-blog/blog/2019/05/14/an-ebpf-overview-part-5-tracing-user-processes/)
+
+22. 华为内核分享系列 
 
     * [Linux内核发展史 (1)](https://www.cnblogs.com/huaweicloud/p/12384872.html)
     * [Linux内核发展史 (2)](https://www.cnblogs.com/huaweicloud/p/12229625.html)
     * [Linux内核发展史 (3)](https://www.cnblogs.com/huaweicloud/p/12383569.html)
     * [Linux内核源码结构（1）](https://www.cnblogs.com/huaweicloud/p/12383792.html)
-    
-22. [NETWORK TRACING USING THE BPF COMPILER COLLECTION](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
 
-23. bpf 归档的邮件列表 https://lore.kernel.org/bpf/， 完整列表 http://vger.kernel.org/vger-lists.html
+23. [NETWORK TRACING USING THE BPF COMPILER COLLECTION](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
+
+24. bpf 归档的邮件列表 https://lore.kernel.org/bpf/， 完整列表 http://vger.kernel.org/vger-lists.html
