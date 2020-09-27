@@ -1,12 +1,14 @@
 # BPF 程序类型
 
+[TOC]
+
+## BPF 程序类型定义
+
 BPF 相关的程序，首先需要设置为相对应的的程序类型，截止Linux 内核 5.8 程序类型定义有 29 个，而且还是持续增加中，完整的列表可参见 [bpf.h](https://github.com/torvalds/linux/blob/master/include/uapi/linux/bpf.h)。
 
-> Linux 5.9 版本 30 个。
+> Linux 5.9 版本 30 个， 分析代码基于[linux v5.8 tag](https://github.com/torvalds/linux/releases/tag/v5.8)
 
- BPF 程序类型（prog_type）决定了程序可以调用的内核辅助函数的子集。BPF 程序类型也决定了程序输入上下文 -- bpf_context结构的格式，其作为 BPF 程序中的第一个输入参数（数据blog）。例如，跟踪程序与套接字过滤器程序的辅助函数子集并不完全相同（尽管它们可能具有一些共同的帮助函数）。同样，跟踪程序的输入上下文（context）是一组寄存器值，而套接字过滤器的输入是一个网络数据包。更加详细的描述参见 man 2 bpf。
-
-代码基于[linux v5.8 tag](https://github.com/torvalds/linux/releases/tag/v5.8)
+ BPF 程序类型（prog_type）决定了程序可以调用的内核辅助函数的子集。BPF 程序类型也决定了程序输入上下文 -- bpf_context 结构的格式，其作为 BPF 程序中的第一个输入参数（数据blog）。例如，跟踪程序与套接字过滤器程序的辅助函数子集并不完全相同（尽管它们可能具有一些共同的帮助函数）。同样，跟踪程序的输入上下文（context）是一组寄存器值，而套接字过滤器的输入是一个网络数据包。更加详细的描述参见 man 2 bpf。
 
 特定类型的eBPF程序可用的功能集将来可能会增加。
 
@@ -47,7 +49,13 @@ include/uapi/linux/bpf.h
  192 };
 ```
 
+## BPF 程序类型确定
+
 程序在载入的过程中会根据 BPF 进行判断，`load_bpf_file` 用户程序用于加载的入口函数，`loader.c` 文件中加载 BPF 程序的使用样例如下：
+
+以 “Hello World ” BPF 程序为例，完整代码参见 [ bpf_program.c](https://github.com/DavadDi/linux-observability-with-bpf/tree/master/code/chapter-2/hello_world)
+
+loader.c 程序
 
 ```c
 #include "bpf_load.h"
@@ -64,7 +72,676 @@ int main(int argc, char **argv) {
   return 0;
 }
 ```
-samples/bpf/bpf_load.h 
+
+bpf_program.c 程序源码
+
+```bash
+#include <linux/bpf.h>
+#define SEC(NAME) __attribute__((section(NAME), used))
+
+static int (*bpf_trace_printk)(const char *fmt, int fmt_size,
+                               ...) = (void *)BPF_FUNC_trace_printk;
+
+SEC("tracepoint/syscalls/sys_enter_execve")
+int bpf_prog(void *ctx) {
+  char msg[] = "Hello, BPF World!";
+  bpf_trace_printk(msg, sizeof(msg));
+  return 0;
+}
+
+char _license[] SEC("license") = "GPL";
+```
+
+
+
+### `load_bpf_file` 函数
+
+参见文件 samples/bpf/bpf_load.c 中的 `load_bpf_file` 函数：
+
+```c
+30 #define DEBUGFS "/sys/kernel/debug/tracing/"  
+31 // 加载过程中需用到的全局变量
+32 static char license[128];
+33 static int kern_version;
+34 static bool processed_sec[128];
+35 char bpf_log_buf[BPF_LOG_BUF_SIZE];
+36 int map_fd[MAX_MAPS];
+37 int prog_fd[MAX_PROGS];
+38 int event_fd[MAX_PROGS];
+39 int prog_cnt;
+40 int prog_array_fd = -1;
+41
+42 struct bpf_map_data map_data[MAX_MAPS];
+43 int map_data_count;
+
+// load_bpf_file 为主程序调用的主入口
+659 int load_bpf_file(char *path)
+660 {
+661         return do_load_bpf_file(path, NULL);
+662 }
+
+// main -> load_bpf_file -> do_load_bpf_file
+508 static int do_load_bpf_file(const char *path, fixup_map_cb fixup_map)
+509 {
+510         int fd, i, ret, maps_shndx = -1, strtabidx = -1;
+511         Elf *elf;
+512         GElf_Ehdr ehdr;
+513         GElf_Shdr shdr, shdr_prog;
+514         Elf_Data *data, *data_prog, *data_maps = NULL, *symbols = NULL;
+515         char *shname, *shname_prog;
+516         int nr_maps = 0;
+
+526         fd = open(path, O_RDONLY, 0);
+527         if (fd < 0)
+528                 return 1;
+529
+530         elf = elf_begin(fd, ELF_C_READ, NULL);
+534
+535         if (gelf_getehdr(elf, &ehdr) != &ehdr)
+536                 return 1;
+
+            // 循环读取 elf 中的所有 sections，获取 license 和 map 相关信息
+541         /* scan over all elf sections to get license and map info */
+542         for (i = 1; i < ehdr.e_shnum; i++) {
+543
+544                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
+545                         continue;
+                    
+  									// 读取 license 信息
+552                 if (strcmp(shname, "license") == 0) {
+553                         processed_sec[i] = true;
+554                         memcpy(license, data->d_buf, data->d_size);
+555                 } else if (strcmp(shname, "version") == 0) { //  读取 version 信息
+556                         processed_sec[i] = true;
+557                         if (data->d_size != sizeof(int)) {
+558                                 printf("invalid size of version section %zd\n",
+559                                        data->d_size);
+560                                 return 1;
+561                         }
+562                         memcpy(&kern_version, data->d_buf, sizeof(int));
+563                 } else if (strcmp(shname, "maps") == 0) {  //  读取 maps 信息
+564                         int j;
+565
+566                         maps_shndx = i;
+567                         data_maps = data;
+568                         for (j = 0; j < MAX_MAPS; j++)
+569                                 map_data[j].fd = -1;
+570                 } else if (shdr.sh_type == SHT_SYMTAB) {
+571                         strtabidx = shdr.sh_link;
+572                         symbols = data;
+573                 }
+574         }
+            // 如果存在 maps 数据，则初始化 map 
+583         if (data_maps) {
+584                 nr_maps = load_elf_maps_section(map_data, maps_shndx,
+585                                                 elf, symbols, strtabidx);
+
+591                 if (load_maps(map_data, nr_maps, fixup_map))
+592                         goto done;
+593                 map_data_count = nr_maps;
+594
+595                 processed_sec[maps_shndx] = true;
+596         }
+597
+            // 处理所有的需要重定向的区域，并完成针对 maps insns 的重写
+598         /* process all relo sections, and rewrite bpf insns for maps */
+599         for (i = 1; i < ehdr.e_shnum; i++) {
+600                 if (processed_sec[i])
+601                         continue;
+602
+603                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
+604                         continue;
+605
+606                 if (shdr.sh_type == SHT_REL) {
+607                         struct bpf_insn *insns;
+608
+609                         /* locate prog sec that need map fixup (relocations) */
+610                         if (get_sec(elf, shdr.sh_info, &ehdr, &shname_prog,
+611                                     &shdr_prog, &data_prog))
+612                                 continue;
+613
+614                         if (shdr_prog.sh_type != SHT_PROGBITS ||
+615                             !(shdr_prog.sh_flags & SHF_EXECINSTR))
+616                                 continue;
+617
+618                         insns = (struct bpf_insn *) data_prog->d_buf;
+619                         processed_sec[i] = true; /* relo section */
+620
+621                         if (parse_relo_and_apply(data, symbols, &shdr, insns,
+622                                                  map_data, nr_maps))
+623                                 continue;
+624                 }
+625         }
+626
+627         /* load programs */
+628         for (i = 1; i < ehdr.e_shnum; i++) {
+629
+630                 if (processed_sec[i])
+631                         continue;
+632
+633                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
+634                         continue;
+635									// 此处进行 BPF 程序类型进行判断，并调用 load_and_attach 进行加载
+636                 if (memcmp(shname, "kprobe/", 7) == 0 ||
+637                     memcmp(shname, "kretprobe/", 10) == 0 ||
+638                     memcmp(shname, "tracepoint/", 11) == 0 ||
+639                     memcmp(shname, "raw_tracepoint/", 15) == 0 ||
+640                     memcmp(shname, "xdp", 3) == 0 ||
+641                     memcmp(shname, "perf_event", 10) == 0 ||
+642                     memcmp(shname, "socket", 6) == 0 ||
+643                     memcmp(shname, "cgroup/", 7) == 0 ||
+644                     memcmp(shname, "sockops", 7) == 0 ||
+645                     memcmp(shname, "sk_skb", 6) == 0 ||
+646                     memcmp(shname, "sk_msg", 6) == 0) {
+647                         ret = load_and_attach(shname, data->d_buf,
+648                                               data->d_size);
+649                         if (ret != 0)
+650                                 goto done;
+651                 }
+652         }
+653
+654 done:
+655         close(fd);
+656         return ret;
+657 }
+```
+
+其中 `get_sec` 函数完整定义如下：
+
+```c
+// main -> load_bpf_file -> do_load_bpf_file -> get_sec
+316 static int get_sec(Elf *elf, int i, GElf_Ehdr *ehdr, char **shname,
+317                    GElf_Shdr *shdr, Elf_Data **data)
+318 {
+319         Elf_Scn *scn;
+320
+321         scn = elf_getscn(elf, i);
+322         if (!scn)
+323                 return 1;
+324
+325         if (gelf_getshdr(scn, shdr) != shdr)
+326                 return 2;
+327
+328         *shname = elf_strptr(elf, ehdr->e_shstrndx, shdr->sh_name);
+329         if (!*shname || !shdr->sh_size)
+330                 return 3;
+331
+332         *data = elf_getdata(scn, 0);
+333         if (!*data || elf_getdata(scn, *data) != NULL)
+334                 return 4;
+335
+336         return 0;
+337 }
+```
+
+### `load_and_attach` 函数
+
+samples/bpf/bpf_load.c 中的函数 `load_and_attach` 函数中确定程序类型，函数 78 - 126 行通过 sec 中定义的名字来确定 BPF 程序类型，比如 `bool is_tracepoint = strncmp(event, "tracepoint/", 11) == 0;` 和 `if (is_tracepoint) { prog_type = BPF_PROG_TYPE_TRACEPOINT`;
+
+在确定程序类型以后，调用 `sys_perf_event_open` 和 `ioctl` 两个函数完成 BPF 程序注册到 trace 数据结构中，255 行代码 `ioctl(efd, PERF_EVENT_IOC_SET_BPF, fd)` 完成了 BPF程序 与 TracePoint 的关联。
+
+```c
+ 76 static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
+ 77 {
+ 78         bool is_socket = strncmp(event, "socket", 6) == 0;
+ 79         bool is_kprobe = strncmp(event, "kprobe/", 7) == 0;
+ 80         bool is_kretprobe = strncmp(event, "kretprobe/", 10) == 0;
+ 81         bool is_tracepoint = strncmp(event, "tracepoint/", 11) == 0;
+ 82         bool is_raw_tracepoint = strncmp(event, "raw_tracepoint/", 15) == 0;
+ 83         bool is_xdp = strncmp(event, "xdp", 3) == 0;
+ 84         bool is_perf_event = strncmp(event, "perf_event", 10) == 0;
+ 85         bool is_cgroup_skb = strncmp(event, "cgroup/skb", 10) == 0;
+ 86         bool is_cgroup_sk = strncmp(event, "cgroup/sock", 11) == 0;
+ 87         bool is_sockops = strncmp(event, "sockops", 7) == 0;
+ 88         bool is_sk_skb = strncmp(event, "sk_skb", 6) == 0;
+ 89         bool is_sk_msg = strncmp(event, "sk_msg", 6) == 0;
+ 90         size_t insns_cnt = size / sizeof(struct bpf_insn);
+ 91         enum bpf_prog_type prog_type;
+ 92         char buf[256];
+ 93         int fd, efd, err, id;
+ 94         struct perf_event_attr attr = {};
+ 95
+ 96         attr.type = PERF_TYPE_TRACEPOINT;
+ 97         attr.sample_type = PERF_SAMPLE_RAW;
+ 98         attr.sample_period = 1;
+ 99         attr.wakeup_events = 1;
+100
+101         if (is_socket) {
+102                 prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
+103         } else if (is_kprobe || is_kretprobe) {
+104                 prog_type = BPF_PROG_TYPE_KPROBE;
+105         } else if (is_tracepoint) {
+106                 prog_type = BPF_PROG_TYPE_TRACEPOINT;
+107         } else if (is_raw_tracepoint) {
+108                 prog_type = BPF_PROG_TYPE_RAW_TRACEPOINT;
+109         } else if (is_xdp) {
+110                 prog_type = BPF_PROG_TYPE_XDP;
+111         } else if (is_perf_event) {
+112                 prog_type = BPF_PROG_TYPE_PERF_EVENT;
+113         } else if (is_cgroup_skb) {
+114                 prog_type = BPF_PROG_TYPE_CGROUP_SKB;
+115         } else if (is_cgroup_sk) {
+116                 prog_type = BPF_PROG_TYPE_CGROUP_SOCK;
+117         } else if (is_sockops) {
+118                 prog_type = BPF_PROG_TYPE_SOCK_OPS;
+119         } else if (is_sk_skb) {
+120                 prog_type = BPF_PROG_TYPE_SK_SKB;
+121         } else if (is_sk_msg) {
+122                 prog_type = BPF_PROG_TYPE_SK_MSG;
+123         } else {
+124                 printf("Unknown event '%s'\n", event);
+125                 return -1;
+126         }
+127
+128         if (prog_cnt == MAX_PROGS) /*#define MAX_PROGS 32 samples/bpf/bpf_load.h*/
+129                 return -1;
+130
+131         fd = bpf_load_program(prog_type, prog, insns_cnt, license, kern_version,
+132                               bpf_log_buf, BPF_LOG_BUF_SIZE);
+				    //....
+   
+168         if (is_kprobe || is_kretprobe) {
+                  // ...
+212         } else if (is_tracepoint) {  // 如果为 tracepoint，获取到 tracepoint id 的完整目录
+213                 event += 11;
+214
+215                 if (*event == 0) {
+216                         printf("event name cannot be empty\n");
+217                         return -1;
+218                 }
+219                 strcpy(buf, DEBUGFS); 
+220                 strcat(buf, "events/"); 
+221                 strcat(buf, event);
+222                 strcat(buf, "/id"); // "/sys/kernel/debug/tracing/syscalls/sys_enter_execve/id"
+223         }
+224         // 1. 打开文件 "/sys/kernel/debug/tracing/syscalls/sys_enter_execve/id"，文件内容 “685”
+225         efd = open(buf, O_RDONLY, 0);
+226         if (efd < 0) {
+227                 printf("failed to open event %s\n", event);
+228                 return -1;
+229         }
+230         // 2. 获取到 event id  “685”
+231         err = read(efd, buf, sizeof(buf));
+232         if (err < 0 || err >= sizeof(buf)) {
+233                 printf("read from '%s' failed '%s'\n", event, strerror(errno));
+234                 return -1;
+235         }
+236
+237         close(efd);
+238
+239         buf[err] = 0;
+240         id = atoi(buf);
+241         attr.config = id;
+242         // 3. 使用 sys_perf_event_open 函数开启  
+243         efd = sys_perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
+244         if (efd < 0) {
+245                 printf("event %d fd %d err %s\n", id, efd, strerror(errno));
+246                 return -1;
+247         }
+248         event_fd[prog_cnt - 1] = efd;
+
+            // 4. 开启该 event 的追踪
+249         err = ioctl(efd, PERF_EVENT_IOC_ENABLE, 0);
+250         if (err < 0) {
+251                 printf("ioctl PERF_EVENT_IOC_ENABLE failed err %s\n",
+252                        strerror(errno));
+253                 return -1;
+254         }
+
+            // 5. 设置当前追踪所对应的 BPF 程序，fd 即为我们本次打开的 BPF 程序 fd
+            // 相关说明参见 https://lwn.net/Articles/683504/
+255         err = ioctl(efd, PERF_EVENT_IOC_SET_BPF, fd);
+256         if (err < 0) {
+257                 printf("ioctl PERF_EVENT_IOC_SET_BPF failed err %s\n",
+258                        strerror(errno));
+259                 return -1;
+260         }
+261
+262         return 0;
+```
+
+在 perf 底层注册结构 `perf_event` ，位于文件 include/linux/trace_events.h
+
+```c
+611 struct perf_event {
+    // ...
+749 #ifdef CONFIG_EVENT_TRACING
+750         struct trace_event_call         *tp_event;   // -> trace_event_call
+751         struct event_filter             *filter;
+752 #ifdef CONFIG_FUNCTION_TRACER
+    // ...
+} 
+
+278 struct trace_event_call {
+		// ..
+305         struct bpf_prog_array __rcu     *prog_array;  // 保存 bpf 程序
+
+310 };
+```
+
+在 event 触发后的代码逻辑
+
+```c
+ // perf event 触发的时候调用 bpf
+ 9240 void perf_trace_run_bpf_submit(void *raw_data, int size, int rctx,
+ 9241                                struct trace_event_call *call, u64 count,
+ 9242                                struct pt_regs *regs, struct hlist_head *head,
+ 9243                                struct task_struct *task)
+ 9244 {
+ 9245         if (bpf_prog_array_valid(call)) {
+ 9246                 *(struct pt_regs **)raw_data = regs;
+ 9247                 if (!trace_call_bpf(call, raw_data) || hlist_empty(head)) { // 调用 bpf 程序
+ 9248                         perf_swevent_put_recursion_context(rctx);
+ 9249                         return;
+ 9250                 }
+ 9251         }
+ 9252         perf_tp_event(call->event.type, count, raw_data, size, regs, head,
+ 9253                       rctx, task);
+ 9254 }
+ 9255 EXPORT_SYMBOL_GPL(perf_trace_run_bpf_submit);
+```
+
+## 样例程序 ELF 和加载分析
+
+使用工具 readelf 查看 `bpf_program.o`  获取相关信息
+
+```bash
+# readelf -h bpf_program.o
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              REL (Relocatable file)
+  Machine:                           Linux BPF                  # Linux BPF 程序类型
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          0 (bytes into file)
+  Start of section headers:          424 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           0 (bytes)
+  Number of program headers:         0
+  Size of section headers:           64 (bytes)
+  Number of section headers:         8
+  Section header string table index: 1
+  
+# readelf -S bpf_program.o
+There are 8 section headers, starting at offset 0x1a8:
+
+Section Headers:
+  [Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  [ 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  [ 1] .strtab           STRTAB           0000000000000000  0000012a
+       0000000000000079  0000000000000000           0     0     1
+  [ 2] .text             PROGBITS         0000000000000000  00000040
+       0000000000000000  0000000000000000  AX       0     0     4
+  [ 3] tracepoint/syscal PROGBITS         0000000000000000  00000040  # 此处决定了 BPF 的程序类型
+       0000000000000070  0000000000000000  AX       0     0     8
+  [ 4] .rodata.str1.1    PROGBITS         0000000000000000  000000b0
+       0000000000000012  0000000000000001 AMS       0     0     1
+  [ 5] license           PROGBITS         0000000000000000  000000c2
+       0000000000000004  0000000000000000  WA       0     0     1
+  [ 6] .llvm_addrsig     LOOS+0xfff4c03   0000000000000000  00000128
+       0000000000000002  0000000000000000   E       7     0     1
+  [ 7] .symtab           SYMTAB           0000000000000000  000000c8
+       0000000000000060  0000000000000018           1     2     8
+```
+
+BPF 的程序类型是在程序加载的时候在内核中进行确定的，一旦程序类型确定，也就确定了 BPF 程序能够访问到的 BPF 内核帮助函数。
+
+```bash
+# strace -ebpf ./bpfload
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=37366, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+bpf(BPF_PROG_LOAD, {prog_type=BPF_PROG_TYPE_TRACEPOINT, insn_cnt=14, insns=0x6fecd0, license="GPL", log_level=0, log_size=0, log_buf=NULL, kern_version=KERNEL_VERSION(0, 0, 0), prog_flags=0, prog_name="", prog_ifindex=0, expected_attach_type=BPF_CGROUP_INET_INGRESS}, 72) = 4
+
+```
+
+一个程序中可以包含多个 section 区域和不同的 BPF 程序类型
+
+```c
+SEC("tracepoint/syscalls/sys_enter_execve")
+int bpf_prog(void *ctx) {
+  char msg[] = "Hello, BPF World!";
+  bpf_trace_printk(msg, sizeof(msg));
+  return 0;
+}
+
+SEC("socket")
+int socket_prog(struct __sk_buff *skb) {
+  return 0;
+}
+```
+
+使用 strace 的结果如下
+
+```bash
+# strace -ebpf ./bpfload
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=37806, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+
+# BPF_PROG_TYPE_TRACEPOINT
+bpf(BPF_PROG_LOAD, {prog_type=BPF_PROG_TYPE_TRACEPOINT, insn_cnt=14, insns=0x1527df0, license="GPL", log_level=0, log_size=0, log_buf=NULL, kern_version=KERNEL_VERSION(0, 0, 0), prog_flags=0, prog_name="", prog_ifindex=0, expected_attach_type=BPF_CGROUP_INET_INGRESS}, 72) = 4
+
+# BPF_PROG_TYPE_SOCKET_FILTER
+bpf(BPF_PROG_LOAD, {prog_type=BPF_PROG_TYPE_SOCKET_FILTER, insn_cnt=2, insns=0x1527e70, license="GPL", log_level=0, log_size=0, log_buf=NULL, kern_version=KERNEL_VERSION(0, 0, 0), prog_flags=0, prog_name="", prog_ifindex=0, expected_attach_type=BPF_CGROUP_INET_INGRESS}, 72) = 6
+^Cstrace: Process 37805 detached
+```
+
+一个 ELF 文件中可以包含多个 BPF 程序，加载后的程序 fd 会保存在全局变量 prog_fd[] 数组中，按照顺序进行加载。
+
+## BPF Verfier 检测（TODO）
+
+BPF Verfier 会根据底层的程序类型进行对应的检查：
+
+```go
+static bool may_access_skb(enum bpf_prog_type type)
+{
+        switch (type) {
+        case BPF_PROG_TYPE_SOCKET_FILTER:
+        case BPF_PROG_TYPE_SCHED_CLS:
+        case BPF_PROG_TYPE_SCHED_ACT:
+                return true;
+        default:
+                return false;
+        }
+}
+```
+
+
+
+## BPF 程序类型支持 Helper 函数列表
+
+每种 BPF 程序类型可以使用的函数列表参见：[program-types](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#program-types)。程序类型对应的函数关系可以通过以下命令来进行获取：
+
+    git grep -W 'func_proto(enum bpf_func_id func_id' kernel/ net/ drivers/
+
+完整的程序类型对应的帮助函数表格如下：
+|Program Type| Helper Functions|
+|------------|-----------------|
+|`BPF_PROG_TYPE_SOCKET_FILTER`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_perf_event_output()` <br> `Base functions`|
+|`BPF_PROG_TYPE_KPROBE`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_event_read_value()` <br> `BPF_FUNC_override_return()` <br> `Tracing functions`|
+|`BPF_PROG_TYPE_SCHED_CLS` <br> `BPF_PROG_TYPE_SCHED_ACT`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_skb_vlan_push()` <br> `BPF_FUNC_skb_vlan_pop()` <br> `BPF_FUNC_skb_change_proto()` <br> `BPF_FUNC_skb_change_type()` <br> `BPF_FUNC_skb_adjust_room()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_set_hash_invalid()` <br> `BPF_FUNC_set_hash()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_fib_lookup()` <br> `BPF_FUNC_skb_get_xfrm_state()` <br> `BPF_FUNC_skb_cgroup_id()` <br> `Base functions`|
+|`BPF_PROG_TYPE_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `Tracing functions`|
+|`BPF_PROG_TYPE_XDP`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_xdp_adjust_head()` <br> `BPF_FUNC_xdp_adjust_meta()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_redirect_map()` <br> `BPF_FUNC_xdp_adjust_tail()` <br> `BPF_FUNC_fib_lookup()` <br> `Base functions`|
+|`BPF_PROG_TYPE_PERF_EVENT`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_prog_read_value()` <br> `Tracing functions`|
+|`BPF_PROG_TYPE_CGROUP_SKB`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `Base functions`|
+|`BPF_PROG_TYPE_CGROUP_SOCK`|`BPF_FUNC_get_current_uid_gid()` <br> `Base functions`|
+|`BPF_PROG_TYPE_LWT_IN`|`BPF_FUNC_lwt_push_encap()` <br> `LWT functions` <br> `Base functions`|
+|`BPF_PROG_TYPE_LWT_OUT`| `LWT functions` <br> `Base functions`|
+|`BPF_PROG_TYPE_LWT_XMIT`| `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_set_hash_invalid()` <br> `LWT functions`|
+|`BPF_PROG_TYPE_SOCK_OPS`|`BPF_FUNC_setsockopt()` <br> `BPF_FUNC_getsockopt()` <br> `BPF_FUNC_sock_ops_cb_flags_set()` <br> `BPF_FUNC_sock_map_update()` <br> `BPF_FUNC_sock_hash_update()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
+|`BPF_PROG_TYPE_SK_SKB`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_sk_redirect_map()` <br> `BPF_FUNC_sk_redirect_hash()` <br> `BPF_FUNC_sk_lookup_tcp()` <br> `BPF_FUNC_sk_lookup_udp()` <br> `BPF_FUNC_sk_release()` <br> `Base functions`|
+|`BPF_PROG_TYPE_CGROUP_DEVICE`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_trace_printk()`|
+|`BPF_PROG_TYPE_SK_MSG`|`BPF_FUNC_msg_redirect_map()` <br> `BPF_FUNC_msg_redirect_hash()` <br> `BPF_FUNC_msg_apply_bytes()` <br> `BPF_FUNC_msg_cork_bytes()` <br> `BPF_FUNC_msg_pull_data()` <br> `BPF_FUNC_msg_push_data()` <br> `BPF_FUNC_msg_pop_data()` <br> `Base functions`|
+|`BPF_PROG_TYPE_RAW_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_skb_output()` <br> `Tracing functions`|
+|`BPF_PROG_TYPE_CGROUP_SOCK_ADDR`|`BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_bind()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
+|`BPF_PROG_TYPE_LWT_SEG6LOCAL`|`BPF_FUNC_lwt_seg6_store_bytes()` <br> `BPF_FUNC_lwt_seg6_action()` <br> `BPF_FUNC_lwt_seg6_adjust_srh()` <br> `LWT functions`|
+|`BPF_PROG_TYPE_LIRC_MODE2`|`BPF_FUNC_rc_repeat()` <br> `BPF_FUNC_rc_keydown()` <br> `BPF_FUNC_rc_pointer_rel()` <br> `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_trace_printk()`|
+|`BPF_PROG_TYPE_SK_REUSEPORT`|`BPF_FUNC_sk_select_reuseport()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_load_bytes_relative()` <br> `Base functions`|
+|`BPF_PROG_TYPE_FLOW_DISSECTOR`|`BPF_FUNC_skb_load_bytes()` <br> `Base functions`|
+
+
+
+## BPF Helper 函数分组
+
+|Function Group| Functions|
+|------------------|-------|
+|`Base functions`| `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_map_peek_elem()` <br> `BPF_FUNC_map_pop_elem()` <br> `BPF_FUNC_map_push_elem()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_ktime_get_boot_ns()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_trace_printk()` <br> `BPF_FUNC_spin_lock()` <br> `BPF_FUNC_spin_unlock()` |
+|`Tracing functions`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_probe_read()` <br> `BPF_FUNC_ktime_get_boot_ns()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_get_current_pid_tgid()` <br> `BPF_FUNC_get_current_task()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_get_current_comm()` <br> `BPF_FUNC_trace_printk()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_perf_event_read()` <br> `BPF_FUNC_probe_write_user()` <br> `BPF_FUNC_current_task_under_cgroup()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_probe_read_str()` <br> `BPF_FUNC_get_current_cgroup_id()` <br> `BPF_FUNC_send_signal()` <br> `BPF_FUNC_probe_read_kernel()` <br> `BPF_FUNC_probe_read_kernel_str()` <br> `BPF_FUNC_probe_read_user()` <br> `BPF_FUNC_probe_read_user_str()` <br> `BPF_FUNC_send_signal_thread()` <br> `BPF_FUNC_get_ns_current_pid_tgid()` <br> `BPF_FUNC_xdp_output()` <br> `BPF_FUNC_get_task_stack()`|
+|`LWT functions`|  `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()`|
+
+## 运行 BPF 程序类型查看
+
+BPF 程序类型可以使用工具 bpftools 进行查看
+
+> yum install bpftool -y 
+>
+> 或者自己从源码编译
+
+```bash
+# bpftool prog help
+Usage: bpftool prog { show | list } [PROG]
+       bpftool prog dump xlated PROG [{ file FILE | opcodes | visual | linum }]
+       bpftool prog dump jited  PROG [{ file FILE | opcodes | linum }]
+       bpftool prog pin   PROG FILE
+       bpftool prog { load | loadall } OBJ  PATH \
+                         [type TYPE] [dev NAME] \
+                         [map { idx IDX | name NAME } MAP]\
+                         [pinmaps MAP_DIR]
+       bpftool prog attach PROG ATTACH_TYPE [MAP]
+       bpftool prog detach PROG ATTACH_TYPE [MAP]
+       bpftool prog tracelog
+       bpftool prog help
+       MAP := { id MAP_ID | pinned FILE }
+       PROG := { id PROG_ID | pinned FILE | tag PROG_TAG }
+       TYPE := { socket | kprobe | kretprobe | classifier | action |q
+[...]
+
+```
+
+查看运行了 `Hello World`  BPF 程序的机器，结果如下：
+
+```bash
+# bpftool prog show
+7: tracepoint  tag c6e8e35bea53af79  gpl
+	loaded_at 2020-09-26T13:19:22+0000  uid 0
+	xlated 112B  jited 86B  memlock 4096B
+```
+
+bpftool 源码中也可以看到名字和类型的对应关系。
+
+```
+const char * const prog_type_name[] = {
+        [BPF_PROG_TYPE_UNSPEC]                  = "unspec",
+        [BPF_PROG_TYPE_SOCKET_FILTER]           = "socket_filter",
+        [BPF_PROG_TYPE_KPROBE]                  = "kprobe",
+        [BPF_PROG_TYPE_SCHED_CLS]               = "sched_cls",
+        [BPF_PROG_TYPE_SCHED_ACT]               = "sched_act",
+        [BPF_PROG_TYPE_TRACEPOINT]              = "tracepoint",
+        [BPF_PROG_TYPE_XDP]                     = "xdp",
+        [BPF_PROG_TYPE_PERF_EVENT]              = "perf_event",
+        [BPF_PROG_TYPE_CGROUP_SKB]              = "cgroup_skb",
+        [BPF_PROG_TYPE_CGROUP_SOCK]             = "cgroup_sock",
+        [BPF_PROG_TYPE_LWT_IN]                  = "lwt_in",
+        [BPF_PROG_TYPE_LWT_OUT]                 = "lwt_out",
+        [BPF_PROG_TYPE_LWT_XMIT]                = "lwt_xmit",
+        [BPF_PROG_TYPE_SOCK_OPS]                = "sock_ops",
+        [BPF_PROG_TYPE_SK_SKB]                  = "sk_skb",
+        [BPF_PROG_TYPE_CGROUP_DEVICE]           = "cgroup_device",
+        [BPF_PROG_TYPE_SK_MSG]                  = "sk_msg",
+        [BPF_PROG_TYPE_RAW_TRACEPOINT]          = "raw_tracepoint",
+        [BPF_PROG_TYPE_CGROUP_SOCK_ADDR]        = "cgroup_sock_addr",
+        [BPF_PROG_TYPE_LWT_SEG6LOCAL]           = "lwt_seg6local",
+        [BPF_PROG_TYPE_LIRC_MODE2]              = "lirc_mode2",
+        [BPF_PROG_TYPE_SK_REUSEPORT]            = "sk_reuseport",
+        [BPF_PROG_TYPE_FLOW_DISSECTOR]          = "flow_dissector",
+        [BPF_PROG_TYPE_CGROUP_SYSCTL]           = "cgroup_sysctl",
+        [BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE] = "raw_tracepoint_writable",
+        [BPF_PROG_TYPE_CGROUP_SOCKOPT]          = "cgroup_sockopt",
+        [BPF_PROG_TYPE_TRACING]                 = "tracing",
+        [BPF_PROG_TYPE_STRUCT_OPS]              = "struct_ops",
+        [BPF_PROG_TYPE_EXT]                     = "ext",
+        [BPF_PROG_TYPE_LSM]                     = "lsm",
+        [BPF_PROG_TYPE_SK_LOOKUP]               = "sk_lookup",
+};
+```
+
+
+
+## TracePoint bpf 程序函数参数读取
+```bash
+# 可以参考到所有的 tracepoint
+$ perf list  
+
+# bcc 工具 tplist 可以查看到 tracepoint 的结构体参数
+$ ./tplist -v syscalls:sys_enter_execve
+syscalls:sys_enter_execve
+    int __syscall_nr;
+    const char * filename;
+    const char *const * argv;
+    const char *const * envp;
+```
+
+HelloWorld 改进版本 [bpf_program_tp_args.c](https://github.com/DavadDi/linux-observability-with-bpf/blob/master/code/chapter-2/hello_world/bpf_program_tp_args.c) 
+
+```c
+#include <linux/bpf.h>
+#define SEC(NAME) __attribute__((section(NAME), used))
+
+static int (*bpf_trace_printk)(const char *fmt, int fmt_size,
+                               ...) = (void *)BPF_FUNC_trace_printk;
+
+/*
+ +---------+
+| 8 bytes | hidden 'struct pt_regs *' (inaccessible to bpf program)
++---------+
+| N bytes | static tracepoint fields defined in tracepoint/format (bpf readonly)
++---------+
+| dynamic | __dynamic_array bytes of tracepoint (inaccessible to bpf yet)
+----------
+ */
+struct execve_params {
+    __u64 hidden_pad;  // hidden 'struct pt_regs *' (inaccessible to bpf program)
+                       // https://lore.kernel.org/patchwork/patch/664886/
+    int syscall_nr;
+    const char * filename;
+    const char *const * argv;
+    const char *const * envp;
+};
+
+SEC("tracepoint/syscalls/sys_enter_execve")
+int bpf_prog(struct execve_params *ctx) {
+  char fmt[] = "sysnr %d, filename";
+  int nr = ctx->syscall_nr;
+  bpf_trace_printk(fmt,sizeof(fmt), nr);
+  return 0;
+}
+
+char _license[] SEC("license") = "GPL";
+```
+
+
+
+## 参考
+
+* [bpf for tracing](http://chrisarges.net/2019/03/21/bpf-for-tracing.html)
+* [trace in linux](http://chrisarges.net/2018/10/04/tracing-in-linux.html)
+* [allow bpf attach to tracepoints](https://lore.kernel.org/patchwork/cover/664890/)
+* [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
+* [eBPF Basics](https://blog.raymond.burkholder.net/index.php?/archives/1000-eBPF-Basics.html)
+* [An update on gobpf - ELF loading, uprobes, more program types](https://kinvolk.io/blog/2017/09/an-update-on-gobpf-elf-loading-uprobes-more-program-types/)
+* [An Invalid bpf_context Access Bug](https://hechao.li/2019/06/20/An-Invalid-bpf_context-Access-Bug/)
+* [bpf 源码阅读](https://zhuanlan.zhihu.com/p/57873790)
+
+
+
+## 完整函数代码
+
+samples/bpf/bpf_load.h 头文件
 ```c
   7 #define MAX_MAPS 32      // 单个程序中的最大 MAP 数目
   8 #define MAX_PROGS 32     // 单个程序中的允许定义的最大 BPF 程序分区的数目
@@ -128,278 +805,7 @@ samples/bpf/bpf_load.h
  57 #endif
 ```
 
-参见文件 samples/bpf/bpf_load.c 中的 `do_load_bpf_file` 函数：
-
-```c
-30 #define DEBUGFS "/sys/kernel/debug/tracing/"  
-31
-32 static char license[128];
-33 static int kern_version;
-34 static bool processed_sec[128];
-35 char bpf_log_buf[BPF_LOG_BUF_SIZE];
-36 int map_fd[MAX_MAPS];
-37 int prog_fd[MAX_PROGS];
-38 int event_fd[MAX_PROGS];
-39 int prog_cnt;
-40 int prog_array_fd = -1;
-41
-42 struct bpf_map_data map_data[MAX_MAPS];
-43 int map_data_count;
-
-659 int load_bpf_file(char *path)
-660 {
-661         return do_load_bpf_file(path, NULL);
-662 }
-
-508 static int do_load_bpf_file(const char *path, fixup_map_cb fixup_map)
-509 {
-510         int fd, i, ret, maps_shndx = -1, strtabidx = -1;
-511         Elf *elf;
-512         GElf_Ehdr ehdr;
-513         GElf_Shdr shdr, shdr_prog;
-514         Elf_Data *data, *data_prog, *data_maps = NULL, *symbols = NULL;
-515         char *shname, *shname_prog;
-516         int nr_maps = 0;
-517
-518         /* reset global variables */
-519         kern_version = 0;
-520         memset(license, 0, sizeof(license));
-521         memset(processed_sec, 0, sizeof(processed_sec));
-522
-523         if (elf_version(EV_CURRENT) == EV_NONE)
-524                 return 1;
-525
-526         fd = open(path, O_RDONLY, 0);
-527         if (fd < 0)
-528                 return 1;
-529
-530         elf = elf_begin(fd, ELF_C_READ, NULL);
-531
-532         if (!elf)
-533                 return 1;
-534
-535         if (gelf_getehdr(elf, &ehdr) != &ehdr)
-536                 return 1;
-537
-538         /* clear all kprobes */
-539         i = write_kprobe_events("");
-540
-541         /* scan over all elf sections to get license and map info */
-542         for (i = 1; i < ehdr.e_shnum; i++) {
-543
-544                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
-545                         continue;
-546
-547                 if (0) /* helpful for llvm debugging */
-548                         printf("section %d:%s data %p size %zd link %d flags %d\n",
-549                                i, shname, data->d_buf, data->d_size,
-550                                shdr.sh_link, (int) shdr.sh_flags);
-551
-552                 if (strcmp(shname, "license") == 0) {
-553                         processed_sec[i] = true;
-554                         memcpy(license, data->d_buf, data->d_size);
-555                 } else if (strcmp(shname, "version") == 0) {
-556                         processed_sec[i] = true;
-557                         if (data->d_size != sizeof(int)) {
-558                                 printf("invalid size of version section %zd\n",
-559                                        data->d_size);
-560                                 return 1;
-561                         }
-562                         memcpy(&kern_version, data->d_buf, sizeof(int));
-563                 } else if (strcmp(shname, "maps") == 0) {
-564                         int j;
-565
-566                         maps_shndx = i;
-567                         data_maps = data;
-568                         for (j = 0; j < MAX_MAPS; j++)
-569                                 map_data[j].fd = -1;
-570                 } else if (shdr.sh_type == SHT_SYMTAB) {
-571                         strtabidx = shdr.sh_link;
-572                         symbols = data;
-573                 }
-574         }
-575
-576         ret = 1;
-577
-578         if (!symbols) {
-579                 printf("missing SHT_SYMTAB section\n");
-580                 goto done;
-581         }
-582
-583         if (data_maps) {
-584                 nr_maps = load_elf_maps_section(map_data, maps_shndx,
-585                                                 elf, symbols, strtabidx);
-586                 if (nr_maps < 0) {
-587                         printf("Error: Failed loading ELF maps (errno:%d):%s\n",
-588                                nr_maps, strerror(-nr_maps));
-589                         goto done;
-590                 }
-591                 if (load_maps(map_data, nr_maps, fixup_map))
-592                         goto done;
-593                 map_data_count = nr_maps;
-594
-595                 processed_sec[maps_shndx] = true;
-596         }
-597
-598         /* process all relo sections, and rewrite bpf insns for maps */
-599         for (i = 1; i < ehdr.e_shnum; i++) {
-600                 if (processed_sec[i])
-601                         continue;
-602
-603                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
-604                         continue;
-605
-606                 if (shdr.sh_type == SHT_REL) {
-607                         struct bpf_insn *insns;
-608
-609                         /* locate prog sec that need map fixup (relocations) */
-610                         if (get_sec(elf, shdr.sh_info, &ehdr, &shname_prog,
-611                                     &shdr_prog, &data_prog))
-612                                 continue;
-613
-614                         if (shdr_prog.sh_type != SHT_PROGBITS ||
-615                             !(shdr_prog.sh_flags & SHF_EXECINSTR))
-616                                 continue;
-617
-618                         insns = (struct bpf_insn *) data_prog->d_buf;
-619                         processed_sec[i] = true; /* relo section */
-620
-621                         if (parse_relo_and_apply(data, symbols, &shdr, insns,
-622                                                  map_data, nr_maps))
-623                                 continue;
-624                 }
-625         }
-626
-627         /* load programs */
-628         for (i = 1; i < ehdr.e_shnum; i++) {
-629
-630                 if (processed_sec[i])
-631                         continue;
-632
-633                 if (get_sec(elf, i, &ehdr, &shname, &shdr, &data))
-634                         continue;
-635
-636                 if (memcmp(shname, "kprobe/", 7) == 0 ||
-637                     memcmp(shname, "kretprobe/", 10) == 0 ||
-638                     memcmp(shname, "tracepoint/", 11) == 0 ||
-639                     memcmp(shname, "raw_tracepoint/", 15) == 0 ||
-640                     memcmp(shname, "xdp", 3) == 0 ||
-641                     memcmp(shname, "perf_event", 10) == 0 ||
-642                     memcmp(shname, "socket", 6) == 0 ||
-643                     memcmp(shname, "cgroup/", 7) == 0 ||
-644                     memcmp(shname, "sockops", 7) == 0 ||
-645                     memcmp(shname, "sk_skb", 6) == 0 ||
-646                     memcmp(shname, "sk_msg", 6) == 0) {
-647                         ret = load_and_attach(shname, data->d_buf,
-648                                               data->d_size);
-649                         if (ret != 0)
-650                                 goto done;
-651                 }
-652         }
-653
-654 done:
-655         close(fd);
-656         return ret;
-657 }
-```
-
-其中 `get_sec` 函数完整定义如下：
-
-```c
-316 static int get_sec(Elf *elf, int i, GElf_Ehdr *ehdr, char **shname,
-317                    GElf_Shdr *shdr, Elf_Data **data)
-318 {
-319         Elf_Scn *scn;
-320
-321         scn = elf_getscn(elf, i);
-322         if (!scn)
-323                 return 1;
-324
-325         if (gelf_getshdr(scn, shdr) != shdr)
-326                 return 2;
-327
-328         *shname = elf_strptr(elf, ehdr->e_shstrndx, shdr->sh_name);
-329         if (!*shname || !shdr->sh_size)
-330                 return 3;
-331
-332         *data = elf_getdata(scn, 0);
-333         if (!*data || elf_getdata(scn, *data) != NULL)
-334                 return 4;
-335
-336         return 0;
-337 }
-```
-
-以最简单样例为例，完整代码参见 [ bpf_program.c](https://github.com/DavadDi/linux-observability-with-bpf/tree/master/code/chapter-2/hello_world)
-
-```
-# cat bpf_program.c
-#include <linux/bpf.h>
-#define SEC(NAME) __attribute__((section(NAME), used))
-
-static int (*bpf_trace_printk)(const char *fmt, int fmt_size,
-                               ...) = (void *)BPF_FUNC_trace_printk;
-
-SEC("tracepoint/syscalls/sys_enter_execve")
-int bpf_prog(void *ctx) {
-  char msg[] = "Hello, BPF World!";
-  bpf_trace_printk(msg, sizeof(msg));
-  return 0;
-}
-
-char _license[] SEC("license") = "GPL";
-```
-
-编译后，我们使用 `readelf` 进行查看编译后以 ELF 格式保存的 `bpf_program.o` 文件：
-
-```bash
-# readelf -h bpf_program.o
-ELF Header:
-  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
-  Class:                             ELF64
-  Data:                              2's complement, little endian
-  Version:                           1 (current)
-  OS/ABI:                            UNIX - System V
-  ABI Version:                       0
-  Type:                              REL (Relocatable file)
-  Machine:                           Linux BPF                  # Linux BPF 程序类型
-  Version:                           0x1
-  Entry point address:               0x0
-  Start of program headers:          0 (bytes into file)
-  Start of section headers:          424 (bytes into file)
-  Flags:                             0x0
-  Size of this header:               64 (bytes)
-  Size of program headers:           0 (bytes)
-  Number of program headers:         0
-  Size of section headers:           64 (bytes)
-  Number of section headers:         8
-  Section header string table index: 1
-  
-# readelf -S bpf_program.o
-There are 8 section headers, starting at offset 0x1a8:
-
-Section Headers:
-  [Nr] Name              Type             Address           Offset
-       Size              EntSize          Flags  Link  Info  Align
-  [ 0]                   NULL             0000000000000000  00000000
-       0000000000000000  0000000000000000           0     0     0
-  [ 1] .strtab           STRTAB           0000000000000000  0000012a
-       0000000000000079  0000000000000000           0     0     1
-  [ 2] .text             PROGBITS         0000000000000000  00000040
-       0000000000000000  0000000000000000  AX       0     0     4
-  [ 3] tracepoint/syscal PROGBITS         0000000000000000  00000040  # 此处决定了 BPF 的程序类型
-       0000000000000070  0000000000000000  AX       0     0     8
-  [ 4] .rodata.str1.1    PROGBITS         0000000000000000  000000b0
-       0000000000000012  0000000000000001 AMS       0     0     1
-  [ 5] license           PROGBITS         0000000000000000  000000c2
-       0000000000000004  0000000000000000  WA       0     0     1
-  [ 6] .llvm_addrsig     LOOS+0xfff4c03   0000000000000000  00000128
-       0000000000000002  0000000000000000   E       7     0     1
-  [ 7] .symtab           SYMTAB           0000000000000000  000000c8
-       0000000000000060  0000000000000018           1     2     8
-```
-
-samples/bpf/bpf_load.c 中的函数 `load_and_attach` 函数中确定程序类型：
+load_and_attach 完整定义
 
 ```c
  76 static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
@@ -538,7 +944,7 @@ samples/bpf/bpf_load.c 中的函数 `load_and_attach` 函数中确定程序类�
 209                 strcat(buf, event_prefix);
 210                 strcat(buf, event);
 211                 strcat(buf, "/id");
-212         } else if (is_tracepoint) {
+212         } else if (is_tracepoint) { // 如果为
 213                 event += 11;
 214
 215                 if (*event == 0) {
@@ -592,64 +998,7 @@ samples/bpf/bpf_load.c 中的函数 `load_and_attach` 函数中确定程序类�
 263 }
 ```
 
-通过函数  `load_and_attach` 中的 212 行 - 262 行分析我们可以得知
 
-```c
-212         } else if (is_tracepoint) {  // 如果为 tracepoint，获取到 tracepoint id 的完整目录
-213                 event += 11;
-214
-215                 if (*event == 0) {
-216                         printf("event name cannot be empty\n");
-217                         return -1;
-218                 }
-219                 strcpy(buf, DEBUGFS); 
-220                 strcat(buf, "events/"); 
-221                 strcat(buf, event);
-222                 strcat(buf, "/id"); // "/sys/kernel/debug/tracing/syscalls/sys_enter_execve/id"
-223         }
-224         // 1. 打开文件 "/sys/kernel/debug/tracing/syscalls/sys_enter_execve/id"，文件内容 “685”
-225         efd = open(buf, O_RDONLY, 0);
-226         if (efd < 0) {
-227                 printf("failed to open event %s\n", event);
-228                 return -1;
-229         }
-230         // 2. 获取到 event id  “685”
-231         err = read(efd, buf, sizeof(buf));
-232         if (err < 0 || err >= sizeof(buf)) {
-233                 printf("read from '%s' failed '%s'\n", event, strerror(errno));
-234                 return -1;
-235         }
-236
-237         close(efd);
-238
-239         buf[err] = 0;
-240         id = atoi(buf);
-241         attr.config = id;
-242         // 3. 使用 sys_perf_event_open 函数开启  
-243         efd = sys_perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
-244         if (efd < 0) {
-245                 printf("event %d fd %d err %s\n", id, efd, strerror(errno));
-246                 return -1;
-247         }
-248         event_fd[prog_cnt - 1] = efd;
-            // 4. 开启该 event 的追踪
-249         err = ioctl(efd, PERF_EVENT_IOC_ENABLE, 0);
-250         if (err < 0) {
-251                 printf("ioctl PERF_EVENT_IOC_ENABLE failed err %s\n",
-252                        strerror(errno));
-253                 return -1;
-254         }
-            // 5. 设置当前追踪所对应的 BPF 程序，fd 即为我们本次打开的 BPF 程序 fd
-            // 相关说明参见 https://lwn.net/Articles/683504/
-255         err = ioctl(efd, PERF_EVENT_IOC_SET_BPF, fd);
-256         if (err < 0) {
-257                 printf("ioctl PERF_EVENT_IOC_SET_BPF failed err %s\n",
-258                        strerror(errno));
-259                 return -1;
-260         }
-261
-262         return 0;
-```
 
 ioctl 函数定义在文件 kernel/events/core.c 文件中
 
@@ -792,8 +1141,6 @@ ioctl 函数定义在文件 kernel/events/core.c 文件中
 1729 }
 1730
 ```
-
-
 
 最终触发的逻辑：
 
@@ -1030,152 +1377,3 @@ ioctl 函数定义在文件 kernel/events/core.c 文件中
 329         return fd;
 330 }
 ```
-
-
-
-BPF 的程序类型是在程序加载的时候在内核中进行确定的，一旦程序类型确定，也就确定了 BPF 程序能够访问到的 BPF 内核帮助函数。
-
-```bash
-# strace -ebpf execsnoop
-bpf(BPF_MAP_CREATE, {map_type=BPF_MAP_TYPE_PERF_EVENT_ARRAY, key_size=4,
-value_size=4, max_entries=8, map_flags=0, inner_map_fd=0, ...}, 72) = 3
-bpf(BPF_PROG_LOAD, {prog_type=BPF_PROG_TYPE_KPROBE, insn_cnt=513,
-insns=0x7f31c0a89000, license="GPL", log_level=0, log_size=0, log_buf=0,
-kern_version=266002, prog_flags=0, ...}, 72) = 4
-bpf(BPF_PROG_LOAD, {prog_type=BPF_PROG_TYPE_KPROBE, insn_cnt=60,
-insns=0x7f31c0a8b7d0, license="GPL", log_level=0, log_size=0, log_buf=0,
-kern_version=266002, prog_flags=0, ...}, 72) = 6
-PCOMM            PID    PPID   RET ARGS
-bpf(BPF_MAP_UPDATE_ELEM, {map_fd=3, key=0x7f31ba81e880, value=0x7f31ba81e910,
-flags=BPF_ANY}, 72) = 0
-bpf(BPF_MAP_UPDATE_ELEM, {map_fd=3, key=0x7f31ba81e910, value=0x7f31ba81e880,
-flags=BPF_ANY}, 72) = 0
-[...]
-
-```
-
-BPF Verfier 会根据底层的程序类型进行对应的检查：
-
-```go
-static bool may_access_skb(enum bpf_prog_type type)
-{
-        switch (type) {
-        case BPF_PROG_TYPE_SOCKET_FILTER:
-        case BPF_PROG_TYPE_SCHED_CLS:
-        case BPF_PROG_TYPE_SCHED_ACT:
-                return true;
-        default:
-                return false;
-        }
-}
-```
-
-每种 BPF 类型可以使用的函数列表参见：[program-types](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#program-types)。程序类型对应的函数关系可以通过以下命令来进行获取：
-
-    git grep -W 'func_proto(enum bpf_func_id func_id' kernel/ net/ drivers/
-
-完整的程序类型对应的帮助函数表格如下：
-|Program Type| Helper Functions|
-|------------|-----------------|
-|`BPF_PROG_TYPE_SOCKET_FILTER`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_perf_event_output()` <br> `Base functions`|
-|`BPF_PROG_TYPE_KPROBE`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_event_read_value()` <br> `BPF_FUNC_override_return()` <br> `Tracing functions`|
-|`BPF_PROG_TYPE_SCHED_CLS` <br> `BPF_PROG_TYPE_SCHED_ACT`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_skb_vlan_push()` <br> `BPF_FUNC_skb_vlan_pop()` <br> `BPF_FUNC_skb_change_proto()` <br> `BPF_FUNC_skb_change_type()` <br> `BPF_FUNC_skb_adjust_room()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_set_hash_invalid()` <br> `BPF_FUNC_set_hash()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_fib_lookup()` <br> `BPF_FUNC_skb_get_xfrm_state()` <br> `BPF_FUNC_skb_cgroup_id()` <br> `Base functions`|
-|`BPF_PROG_TYPE_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `Tracing functions`|
-|`BPF_PROG_TYPE_XDP`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_xdp_adjust_head()` <br> `BPF_FUNC_xdp_adjust_meta()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_redirect_map()` <br> `BPF_FUNC_xdp_adjust_tail()` <br> `BPF_FUNC_fib_lookup()` <br> `Base functions`|
-|`BPF_PROG_TYPE_PERF_EVENT`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_prog_read_value()` <br> `Tracing functions`|
-|`BPF_PROG_TYPE_CGROUP_SKB`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `Base functions`|
-|`BPF_PROG_TYPE_CGROUP_SOCK`|`BPF_FUNC_get_current_uid_gid()` <br> `Base functions`|
-|`BPF_PROG_TYPE_LWT_IN`|`BPF_FUNC_lwt_push_encap()` <br> `LWT functions` <br> `Base functions`|
-|`BPF_PROG_TYPE_LWT_OUT`| `LWT functions` <br> `Base functions`|
-|`BPF_PROG_TYPE_LWT_XMIT`| `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_set_hash_invalid()` <br> `LWT functions`|
-|`BPF_PROG_TYPE_SOCK_OPS`|`BPF_FUNC_setsockopt()` <br> `BPF_FUNC_getsockopt()` <br> `BPF_FUNC_sock_ops_cb_flags_set()` <br> `BPF_FUNC_sock_map_update()` <br> `BPF_FUNC_sock_hash_update()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
-|`BPF_PROG_TYPE_SK_SKB`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_sk_redirect_map()` <br> `BPF_FUNC_sk_redirect_hash()` <br> `BPF_FUNC_sk_lookup_tcp()` <br> `BPF_FUNC_sk_lookup_udp()` <br> `BPF_FUNC_sk_release()` <br> `Base functions`|
-|`BPF_PROG_TYPE_CGROUP_DEVICE`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_trace_printk()`|
-|`BPF_PROG_TYPE_SK_MSG`|`BPF_FUNC_msg_redirect_map()` <br> `BPF_FUNC_msg_redirect_hash()` <br> `BPF_FUNC_msg_apply_bytes()` <br> `BPF_FUNC_msg_cork_bytes()` <br> `BPF_FUNC_msg_pull_data()` <br> `BPF_FUNC_msg_push_data()` <br> `BPF_FUNC_msg_pop_data()` <br> `Base functions`|
-|`BPF_PROG_TYPE_RAW_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_skb_output()` <br> `Tracing functions`|
-|`BPF_PROG_TYPE_CGROUP_SOCK_ADDR`|`BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_bind()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
-|`BPF_PROG_TYPE_LWT_SEG6LOCAL`|`BPF_FUNC_lwt_seg6_store_bytes()` <br> `BPF_FUNC_lwt_seg6_action()` <br> `BPF_FUNC_lwt_seg6_adjust_srh()` <br> `LWT functions`|
-|`BPF_PROG_TYPE_LIRC_MODE2`|`BPF_FUNC_rc_repeat()` <br> `BPF_FUNC_rc_keydown()` <br> `BPF_FUNC_rc_pointer_rel()` <br> `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_trace_printk()`|
-|`BPF_PROG_TYPE_SK_REUSEPORT`|`BPF_FUNC_sk_select_reuseport()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_load_bytes_relative()` <br> `Base functions`|
-|`BPF_PROG_TYPE_FLOW_DISSECTOR`|`BPF_FUNC_skb_load_bytes()` <br> `Base functions`|
-
-|Function Group| Functions|
-|------------------|-------|
-|`Base functions`| `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_map_peek_elem()` <br> `BPF_FUNC_map_pop_elem()` <br> `BPF_FUNC_map_push_elem()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_ktime_get_boot_ns()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_trace_printk()` <br> `BPF_FUNC_spin_lock()` <br> `BPF_FUNC_spin_unlock()` |
-|`Tracing functions`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_probe_read()` <br> `BPF_FUNC_ktime_get_boot_ns()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_get_current_pid_tgid()` <br> `BPF_FUNC_get_current_task()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_get_current_comm()` <br> `BPF_FUNC_trace_printk()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_perf_event_read()` <br> `BPF_FUNC_probe_write_user()` <br> `BPF_FUNC_current_task_under_cgroup()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_probe_read_str()` <br> `BPF_FUNC_get_current_cgroup_id()` <br> `BPF_FUNC_send_signal()` <br> `BPF_FUNC_probe_read_kernel()` <br> `BPF_FUNC_probe_read_kernel_str()` <br> `BPF_FUNC_probe_read_user()` <br> `BPF_FUNC_probe_read_user_str()` <br> `BPF_FUNC_send_signal_thread()` <br> `BPF_FUNC_get_ns_current_pid_tgid()` <br> `BPF_FUNC_xdp_output()` <br> `BPF_FUNC_get_task_stack()`|
-|`LWT functions`|  `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()`|
-
-
-
-BPF 程序类型可以使用工具 bpftools 进行查看
-
-```bash
-# bpftool prog help
-Usage: bpftool prog { show | list } [PROG]
-       bpftool prog dump xlated PROG [{ file FILE | opcodes | visual | linum }]
-       bpftool prog dump jited  PROG [{ file FILE | opcodes | linum }]
-       bpftool prog pin   PROG FILE
-       bpftool prog { load | loadall } OBJ  PATH \
-                         [type TYPE] [dev NAME] \
-                         [map { idx IDX | name NAME } MAP]\
-                         [pinmaps MAP_DIR]
-       bpftool prog attach PROG ATTACH_TYPE [MAP]
-       bpftool prog detach PROG ATTACH_TYPE [MAP]
-       bpftool prog tracelog
-       bpftool prog help
-       MAP := { id MAP_ID | pinned FILE }
-       PROG := { id PROG_ID | pinned FILE | tag PROG_TAG }
-       TYPE := { socket | kprobe | kretprobe | classifier | action |q
-[...]
-
-```
-
-
-
-```
-const char * const prog_type_name[] = {
-        [BPF_PROG_TYPE_UNSPEC]                  = "unspec",
-        [BPF_PROG_TYPE_SOCKET_FILTER]           = "socket_filter",
-        [BPF_PROG_TYPE_KPROBE]                  = "kprobe",
-        [BPF_PROG_TYPE_SCHED_CLS]               = "sched_cls",
-        [BPF_PROG_TYPE_SCHED_ACT]               = "sched_act",
-        [BPF_PROG_TYPE_TRACEPOINT]              = "tracepoint",
-        [BPF_PROG_TYPE_XDP]                     = "xdp",
-        [BPF_PROG_TYPE_PERF_EVENT]              = "perf_event",
-        [BPF_PROG_TYPE_CGROUP_SKB]              = "cgroup_skb",
-        [BPF_PROG_TYPE_CGROUP_SOCK]             = "cgroup_sock",
-        [BPF_PROG_TYPE_LWT_IN]                  = "lwt_in",
-        [BPF_PROG_TYPE_LWT_OUT]                 = "lwt_out",
-        [BPF_PROG_TYPE_LWT_XMIT]                = "lwt_xmit",
-        [BPF_PROG_TYPE_SOCK_OPS]                = "sock_ops",
-        [BPF_PROG_TYPE_SK_SKB]                  = "sk_skb",
-        [BPF_PROG_TYPE_CGROUP_DEVICE]           = "cgroup_device",
-        [BPF_PROG_TYPE_SK_MSG]                  = "sk_msg",
-        [BPF_PROG_TYPE_RAW_TRACEPOINT]          = "raw_tracepoint",
-        [BPF_PROG_TYPE_CGROUP_SOCK_ADDR]        = "cgroup_sock_addr",
-        [BPF_PROG_TYPE_LWT_SEG6LOCAL]           = "lwt_seg6local",
-        [BPF_PROG_TYPE_LIRC_MODE2]              = "lirc_mode2",
-        [BPF_PROG_TYPE_SK_REUSEPORT]            = "sk_reuseport",
-        [BPF_PROG_TYPE_FLOW_DISSECTOR]          = "flow_dissector",
-        [BPF_PROG_TYPE_CGROUP_SYSCTL]           = "cgroup_sysctl",
-        [BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE] = "raw_tracepoint_writable",
-        [BPF_PROG_TYPE_CGROUP_SOCKOPT]          = "cgroup_sockopt",
-        [BPF_PROG_TYPE_TRACING]                 = "tracing",
-        [BPF_PROG_TYPE_STRUCT_OPS]              = "struct_ops",
-        [BPF_PROG_TYPE_EXT]                     = "ext",
-        [BPF_PROG_TYPE_LSM]                     = "lsm",
-        [BPF_PROG_TYPE_SK_LOOKUP]               = "sk_lookup",
-};
-```
-
-
-
-## 参考
-
-* [bpf for tracing](http://chrisarges.net/2019/03/21/bpf-for-tracing.html)
-
-* [trace in linux](http://chrisarges.net/2018/10/04/tracing-in-linux.html)
-
-* [allow bpf attach to tracepoints](https://lore.kernel.org/patchwork/cover/664890/)
-
-* [Taming Tracepoints in the Linux Kernel](https://blogs.oracle.com/linux/taming-tracepoints-in-the-linux-kernel)
