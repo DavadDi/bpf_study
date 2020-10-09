@@ -605,12 +605,13 @@ build: ${BPFCODE.c} ${BPFLOADER}
 * [全面介绍eBPF-概念](https://www.cnblogs.com/charlieroro/p/13403672.html)
 * [大卫李](https://davidlovezoe.club/wordpress/)
 * [Linux 内核之旅](http://kerneltravel.net/categories/ebpf/)
-* [实现一个基于XDP_eBPF的学习型网桥](http://news.eeworld.com.cn/mp/ymc/a76089.jspx)
 * [eBPF Up & Running: Overview](https://rpi.werls.top/index.php/2020/07/11/ebpf-up-running-overview/)
 * [github awesome-ebpf](https://github.com/zoidbergwill/awesome-ebpf)
 * [浅谈Service Mesh体系中的Envoy](https://www.cnblogs.com/liuhongru/p/11413204.html)
 * [arthurchiao](http://arthurchiao.art/)
-* [实现一个基于XDP_eBPF的学习型网桥](https://mp.weixin.qq.com/s?__biz=MzAwMDUwNDgxOA==&mid=2652666474&idx=1&sn=d78dad0280470e661076ee3660c4eea9&chksm=810f3cf7b678b5e1a93f749fe9c5429cd87aef81c117649302176c16b12866f951df0c306496&scene=21#wechat_redirect) 和 [用Linux内核的瑞士军刀-eBPF实现socket转发offload](https://mp.weixin.qq.com/s/VL6oKW1m0PXmuuE1v8h0iw)
+* [实现一个基于XDP_eBPF的学习型网桥](https://mp.weixin.qq.com/s?__biz=MzAwMDUwNDgxOA==&mid=2652666474&idx=1&sn=d78dad0280470e661076ee3660c4eea9&chksm=810f3cf7b678b5e1a93f749fe9c5429cd87aef81c117649302176c16b12866f951df0c306496&scene=21#wechat_redirect)  [用Linux内核的瑞士军刀-eBPF实现socket转发offload](https://mp.weixin.qq.com/s/VL6oKW1m0PXmuuE1v8h0iw)  和 [eBPF/sockmap实现socket转发offload](https://blog.csdn.net/hbhgyu/article/details/108854003)
+  * https://lwn.net/Articles/731133/ 
+  * https://blog.cloudflare.com/sockmap-tcp-splicing-of-the-future/
 
 
 
@@ -706,3 +707,9 @@ build: ${BPFCODE.c} ${BPFLOADER}
 23. [NETWORK TRACING USING THE BPF COMPILER COLLECTION](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
 
 24. bpf 归档的邮件列表 https://lore.kernel.org/bpf/， 完整列表 http://vger.kernel.org/vger-lists.html
+
+25. PPT https://speakerdeck.com/tuxology/the-bsd-packet-filter?slide=28
+
+26. [图解linux tcpdump](https://jgsun.github.io/2019/01/21/linux-tcpdump/)
+
+27. [tracing in linux](http://chrisarges.net/2018/10/04/tracing-in-linux.html     )

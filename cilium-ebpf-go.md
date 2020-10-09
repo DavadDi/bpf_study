@@ -11,6 +11,18 @@ godoc 地址： https://godoc.org/github.com/cilium/ebpf
 
 可以实现将 C 代码编写的 bpf 程序编译成 Go 代码。
 
+test.c
+
+```c
+// +build ignore
+
+char __license[] __attribute__((section("license"), used)) = "MIT";
+
+__attribute__((section("socket"), used)) int filter() { return 0; }
+```
+
+将 C 文件编译成 Go 代码
+
 ```bash
 # go build -o bpf2go
 # export GOPACKAGE="sock"   // 定义生产 go 代码的包名

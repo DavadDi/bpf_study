@@ -98,6 +98,12 @@ char _license[] SEC("license") = "GPL";
 
 参见文件 samples/bpf/bpf_load.c 中的 `load_bpf_file` 函数：
 
+> 此三个变量为全局
+>
+> 36 int map_fd[MAX_MAPS];
+> 37 int prog_fd[MAX_PROGS];
+> 38 int event_fd[MAX_PROGS];
+
 ```c
 30 #define DEBUGFS "/sys/kernel/debug/tracing/"  
 31 // 加载过程中需用到的全局变量
