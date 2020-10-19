@@ -845,9 +845,127 @@ arch/x86/kernel/kprobes/core.c
  876 NOKPROBE_SYMBOL(trampoline_handler);
 ```
 
+## KProbes Event
+
+基于 KProbes 技术的基础，使用的前端有两种接口 ftrace 和 perf，通过 ftrace 设置启用 KProbes 以后，在底层实现上是注册了函数 `kprobe_dispatcher` 和 `kretprobe_dispatcher` ，也就是说为了搜集 KProbes 的触发的 Event，都会统一在 `kprobe_dispatcher`  函数中进行处理：
+
+相关结构定义
+
+```c
+/*
+ * Kprobe event core functions
+ */
+struct trace_kprobe {
+  struct dyn_event  devent;
+  struct kretprobe  rp; /* Use rp.kp for kprobe use */  // 内部嵌入了  kprobe
+  unsigned long __percpu *nhit;
+  const char    *symbol;  /* symbol name */  // 跟踪的函数名称
+  struct trace_probe  tp;
+};
 
 
-## 参考：
+struct trace_probe {
+  struct list_head    list;
+  struct trace_probe_event  *event;
+  ssize_t       size; /* trace entry size */
+  unsigned int      nr_args;
+  struct probe_arg    args[];
+};
+
+struct kretprobe {
+  struct kprobe kp;
+  kretprobe_handler_t handler;
+  kretprobe_handler_t entry_handler;
+  int maxactive;
+  int nmissed;
+  size_t data_size;
+  struct hlist_head free_instances;
+  raw_spinlock_t lock;
+};
+```
+
+`kprobe_dispatcher` 函数定义：
+
+```c
+static int kprobe_dispatcher(struct kprobe *kp, struct pt_regs *regs)
+{
+  // 通过 kprobe 结构反推到 trace_kprobe 结构
+	struct trace_kprobe *tk = container_of(kp, struct trace_kprobe, rp.kp);
+	int ret = 0;
+
+	raw_cpu_inc(*tk->nhit);
+
+	if (trace_probe_test_flag(&tk->tp, TP_FLAG_TRACE)) // 基于 ftrace 的方式
+		kprobe_trace_func(tk, regs);
+#ifdef CONFIG_PERF_EVENTS
+	if (trace_probe_test_flag(&tk->tp, TP_FLAG_PROFILE)) // 基于 PROFILE 的方式 Perf 
+		ret = kprobe_perf_func(tk, regs);
+#endif
+	return ret;
+}
+NOKPROBE_SYMBOL(kprobe_dispatcher);
+```
+
+
+
+在 Perf 的方式下，可以挂载 BPF 相关程序，在  `kprobe_perf_func` 函数中通过 `bpf_prog_array_valid`函数进行 BPF 程序判断。
+
+```c
+/* Kprobe profile handler */
+static int
+kprobe_perf_func(struct trace_kprobe *tk, struct pt_regs *regs)
+{
+	struct trace_event_call *call = trace_probe_event_call(&tk->tp);
+	struct kprobe_trace_entry_head *entry;
+	struct hlist_head *head;
+	int size, __size, dsize;
+	int rctx;
+
+	if (bpf_prog_array_valid(call)) { // 判断是否注入了 BPF 程序
+		unsigned long orig_ip = instruction_pointer(regs);
+		int ret;
+
+		ret = trace_call_bpf(call, regs); // 调用 BPF 程序
+
+		/*
+		 * We need to check and see if we modified the pc of the
+		 * pt_regs, and if so return 1 so that we don't do the
+		 * single stepping.
+		 */
+		if (orig_ip != instruction_pointer(regs))
+			return 1;
+		if (!ret)
+			return 0;
+	}
+
+	head = this_cpu_ptr(call->perf_events);
+	if (hlist_empty(head))
+		return 0;
+
+	dsize = __get_data_size(&tk->tp, regs);
+	__size = sizeof(*entry) + tk->tp.size + dsize;
+	size = ALIGN(__size + sizeof(u32), sizeof(u64));
+	size -= sizeof(u32);
+
+	entry = perf_trace_buf_alloc(size, NULL, &rctx); // 创建 perf event
+	if (!entry)
+		return 0;
+
+	entry->ip = (unsigned long)tk->rp.kp.addr;
+	memset(&entry[1], 0, dsize);
+	store_trace_args(&entry[1], &tk->tp, regs, sizeof(*entry), dsize);
+	perf_trace_buf_submit(entry, size, rctx, call->event.type, 1, regs,
+			      head, NULL);
+	return 0;
+}
+NOKPROBE_SYMBOL(kprobe_perf_func);
+```
+
+
+
+
+
+## 参考
 
 * https://blog.csdn.net/pwl999/article/details/80689127
 
