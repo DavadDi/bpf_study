@@ -161,8 +161,13 @@ eBPF 分为用户空间程序和内核程序两部分：
 1. 我们可以使用 LLVM 或者 GCC 工具将编写的 BPF 代码程序编译成 BPF 字节码；
 2. 然后使用加载程序 Loader 将字节码加载至内核；内核使用验证器（verfier） 组件保证执行字节码的安全性，以避免对内核造成灾难，在确认字节码安全后将其加载对应的内核模块执行；BPF 观测技术相关的程序程序类型可能是 kprobes/uprobes/tracepoint/perf_events 中的一个或多个，其中：
    * **kprobes**：实现内核中动态跟踪。 kprobes 可以跟踪到 Linux 内核中的函数入口或返回点，但是不是稳定 ABI 接口，可能会因为内核版本变化导致，导致跟踪失效。
+   
+     > 理论上可以跟踪到所有导出的符号 /proc/kallsyms
+   
    * **uprobes**：用户级别的动态跟踪。与 kprobes 类似，只是跟踪的函数为用户程序中的函数。
+   
    * **tracepoints**：内核中静态跟踪。tracepoints 是内核开发人员维护的跟踪点，能够提供稳定的 ABI 接口，但是由于是研发人员维护，数量和场景可能受限。
+   
    * **perf_events**：定时采样和 PMC。
 3. 内核中运行的 BPF 字节码程序可以使用两种方式将测量数据回传至用户空间
    * **maps** 方式可用于将内核中实现的统计摘要信息（比如测量延迟、堆栈信息）等回传至用户空间；
@@ -579,6 +584,19 @@ build: ${BPFCODE.c} ${BPFLOADER}
 
 完整的程序参见：[hello_world](https://github.com/DavadDi/linux-observability-with-bpf/tree/master/code/chapter-2/hello_world)；更多的样例代码可以参见对应内核中 `kernel-src/samples/bpf/` 下的样例代码。
 
+
+
+> 环境备注：  fedora/33 5.8 内核 https://www.sohu.com/a/428060138_495675
+>
+> ```bash
+> vagrant init fedora/33-cloud-base \
+> --box-version 33.20201019.0
+> vagrant up
+> ```
+> $ uname -r
+> 5.8.15-301.fc33.x86_64
+
+
 ## 5. 国内大厂 eBPF 实践总结
 
 * [eBPF 在网易轻舟云原生的应用实践](https://www.infoq.cn/article/OVCVwQijztA7JlexgDOc)
@@ -713,3 +731,5 @@ build: ${BPFCODE.c} ${BPFLOADER}
 26. [图解linux tcpdump](https://jgsun.github.io/2019/01/21/linux-tcpdump/)
 
 27. [tracing in linux](http://chrisarges.net/2018/10/04/tracing-in-linux.html     )
+
+28. [**A Deep Dive into eBPF: The Technology that Powers Tracee**](https://blog.aquasec.com/intro-ebpf-tracing-containers)
