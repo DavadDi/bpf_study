@@ -33,8 +33,10 @@
  0)   0.141 us    |        __local_bh_enable_ip();
  0)   1.290 us    |      }
  0)               |      __inet_stream_connect() {
+                           // 用于 bpf 中的 connect 地址修改，参见类型 cgroup/connect4， 文件 tools/testing/selftests/bpf/progs/connect4_prog.c
+                           // PR https://www.spinics.net/lists/netdev/msg492710.html  tcp_v4_pre_connect                          
  0)               |        tcp_v4_pre_connect() {
- 0)   0.140 us    |          __cgroup_bpf_run_filter_sock_addr();
+ 0)   0.140 us    |          __cgroup_bpf_run_filter_sock_addr(); 
  0)   0.411 us    |        }
  0)               |        tcp_v4_connect() {
  0)               |          ip_route_output_key_hash() {
