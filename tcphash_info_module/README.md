@@ -1,6 +1,24 @@
 # 通过内核模块获取 tcphash_info 信息
 
-## 介绍
+[TOC]
+
+## 1. 测试环境
+
+```bash
+# lsb_release -a
+LSB Version:	:core-4.1-amd64:core-4.1-noarch
+Distributor ID:	CentOS
+Description:	CentOS Linux release 7.7.1908 (Core)
+Release:	7.7.1908
+Codename:	Core
+
+# uname -a
+Linux bje-qtt-backend-paas-05 3.10.0-1062.9.1.el7.x86_64 #1 SMP Fri Dec 6 15:49:49 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+
+
+## 2. 介绍
 
 在网络问题排查的过程中，有时候需要了解内核中保存的 tcphash_info 信息，仅仅通过 BPF 还是缺少更加细致的分析，这种情况下可以通过 kernel 模块访问到 tcphash_info 的结构体，由于是遍历会获取 lock，因此只能用于学习。
 
@@ -69,7 +87,7 @@ EXPORT_SYMBOL_GPL(__inet_lookup_established);
 
 
 
-## 使用
+## 3. 使用
 
 ```bash
 # make
@@ -86,6 +104,6 @@ EXPORT_SYMBOL_GPL(__inet_lookup_established);
 # rmmode tcphash
 ```
 
-## 其他
+## 4. `tcp_rcv.py` 脚本说明
 关于 `tcp_rcv.py` 文件是我排查 tcp_reset 过程中使用的脚本，分析过程中有比较多的干扰因素，因此我在代码中写死了源地址和目标端口，实现思路仅供参考，不是能够按照帮助说明自由组合的脚本，因为有些函数返回值不同。
 
