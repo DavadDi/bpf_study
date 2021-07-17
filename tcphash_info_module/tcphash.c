@@ -29,6 +29,8 @@ void print_tcp_socks(void)
     printk("--- Established ---");
     for (i = 0; i <= tcp_hashinfo.ehash_mask; i++) {
         struct sock *sk;
+        // see struct https://elixir.bootlin.com/linux/v3.10.108/source/include/linux/tcp.h#L146
+        struct tcp_sock *tp;
         struct hlist_nulls_node *node;
         spinlock_t *lock = inet_ehash_lockp(&tcp_hashinfo, i);
 
@@ -42,8 +44,9 @@ void print_tcp_socks(void)
                 continue;
 
             inet = inet_sk(sk);
+            tp = tcp_sk(sk);
 
-            printk("%u.%u.%u.%u:%hu ---> %u.%u.%u.%u:%hu\n",
+            printk("%u.%u.%u.%u:%hu ---> %u.%u.%u.%u:%hu,ack first byte 0x%x  send_next 0x%x rcv_next  0x%x\n",
     		 ((unsigned char *)&inet->inet_saddr)[0], 
    		 ((unsigned char *)&inet->inet_saddr)[1],
     		 ((unsigned char *)&inet->inet_saddr)[2],
@@ -53,7 +56,10 @@ void print_tcp_socks(void)
                  ((unsigned char *)&inet->inet_daddr)[1],
                  ((unsigned char *)&inet->inet_daddr)[2],
                  ((unsigned char *)&inet->inet_daddr)[3],
-            	ntohs(inet->inet_dport));
+            	ntohs(inet->inet_dport),
+                tp->snd_una,
+		tp->snd_nxt,
+		tp->rcv_nxt);
         }
         spin_unlock_bh(lock);
 	
