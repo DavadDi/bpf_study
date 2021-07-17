@@ -490,7 +490,7 @@ b.trace_print()
 
 
 
-### 4.3 BPFTrace 
+### 4.2 BPFTrace 
 
 BPFTrace 是基于 BPF 和 BCC 的开源项目，与 BCC 不同的是其提供了更高层次的抽象，可以使用类似 AWK 脚本语言来编写基于 BPF 的跟踪或者性能排查工具，更加易于入门和编写，该工具的主要灵感来自于 Solaris 的 D 语言。BPFTrace 更方便与编写单行的程序。BPFTrace 与 BCC 一样也是 IO Visor 组织下的项目，仓库参见 [bpftrace](https://github.com/iovisor/bpftrace)。更加深入的学习资料参见：[Reference Guide](https://github.com/iovisor/bpftrace/blob/master/docs/reference_guide.md) 和 [One-Liner Tutorial](https://github.com/iovisor/bpftrace/blob/master/docs/tutorial_one_liners.md)。
 
