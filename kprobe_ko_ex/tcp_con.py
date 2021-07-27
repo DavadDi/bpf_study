@@ -14,6 +14,8 @@ text="""
 #include <net/ip.h>
 #include <uapi/linux/bpf.h>
 
+// see https://github.com/iovisor/bcc/blob/151fe198988ce3ab10964f4fca4401978caa18f1/tools/tcpdrop.py
+
 static inline struct iphdr *skb_to_iphdr(const struct sk_buff *skb)
 {
     // unstable API. verify logic in ip_hdr() -> skb_network_header().
