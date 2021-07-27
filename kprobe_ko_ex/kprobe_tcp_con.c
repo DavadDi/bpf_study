@@ -40,7 +40,7 @@ static int kp_request_prehandler(struct kprobe *p, struct pt_regs *ctx)
 #define PT_REGS_PARM6(ctx)	((ctx)->r9)
 #define PT_REGS_RET(ctx)	((ctx)->sp)
 */
-    skb = (void *)((ctx)->cx); // 获取 skb 参数
+    skb = (void *)((ctx)->cx); // 获取 skb 参数 使用 regs_get_kernel_argument 函数更好 https://github.com/torvalds/linux/blob/6daa755f813e6aa0bcc97e352666e072b1baac25/arch/x86/include/asm/ptrace.h#L342
     iphdr = (struct iphdr *)(skb->head + skb->network_header);
 
     printk(KERN_INFO "[tcp_conn_request] src %x -> dst %x\n", iphdr->saddr, iphdr->daddr);
