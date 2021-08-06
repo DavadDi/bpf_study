@@ -56,6 +56,7 @@ struct event_t {
     u32 len;
     u8 ip_version;
     u8 l4_proto;
+    u16 tot_len;
     u64 saddr[2];
     u64 daddr[2];
     u8 icmptype;
@@ -298,6 +299,7 @@ do_trace_skb(struct event_t *event, void *ctx, struct sk_buff *skb, void *netdev
         event->l4_proto  = iphdr.protocol;
         event->saddr[0] = iphdr.saddr;
         event->daddr[0] = iphdr.daddr;
+	event->tot_len = ntohs(iphdr.tot_len);
 
 	if (event->l4_proto == IPPROTO_ICMP) {
        	    proto_icmp_echo_request = ICMP_ECHO;
@@ -312,6 +314,8 @@ do_trace_skb(struct event_t *event, void *ctx, struct sk_buff *skb, void *netdev
         bpf_probe_read(&event->l4_proto,  sizeof(ipv6hdr->nexthdr),  (char*)ipv6hdr + offsetof(struct ipv6hdr, nexthdr));
         bpf_probe_read(event->saddr, sizeof(ipv6hdr->saddr),   (char*)ipv6hdr + offsetof(struct ipv6hdr, saddr));
         bpf_probe_read(event->daddr, sizeof(ipv6hdr->daddr),   (char*)ipv6hdr + offsetof(struct ipv6hdr, daddr));
+	bpf_probe_read(&event->tot_len, sizeof(ipv6hdr->payload_len), (char*)ipv6hdr + offsetof(struct ipv6hdr, payload_len));
+        event->tot_len = ntohs(event->tot_len);
 
 	if (event->l4_proto == IPPROTO_ICMPV6) {
             proto_icmp_echo_request = ICMPV6_ECHO_REQUEST;
