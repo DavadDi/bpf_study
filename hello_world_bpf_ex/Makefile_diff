@@ -1,0 +1,27 @@
+# diff -u Makefile.old Makefile
+--- Makefile.old	2021-09-26 03:16:16.883348130 +0000
++++ Makefile	2021-09-26 03:20:46.732277872 +0000
+@@ -55,6 +55,7 @@
+ tprogs-y += xdp_sample_pkts
+ tprogs-y += ibumad
+ tprogs-y += hbm
++tprogs-y += hello
+
+ # Libbpf dependencies
+ LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
+@@ -113,6 +114,7 @@
+ xdp_sample_pkts-objs := xdp_sample_pkts_user.o
+ ibumad-objs := ibumad_user.o
+ hbm-objs := hbm.o $(CGROUP_HELPERS)
++hello-objs := hello_user.o $(TRACE_HELPERS)
+
+ # Tell kbuild to always build the programs
+ always-y := $(tprogs-y)
+@@ -174,6 +176,7 @@
+ always-y += hbm_out_kern.o
+ always-y += hbm_edt_kern.o
+ always-y += xdpsock_kern.o
++always-y += hello_kern.o
+
+ ifeq ($(ARCH), arm)
+ # Strip all except -D__LINUX_ARM_ARCH__ option needed to handle linux
