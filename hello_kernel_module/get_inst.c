@@ -20,7 +20,7 @@ static int __init hello_init(void)
 
     for (i = 0; i < 5; i++)
     {
-	pr_info("fun addr 0x%02x ", (u8)func_addr[i]);
+	pr_info("0x%02x ", (u8)func_addr[i]);
     }
 
     pr_info("fun addr 0x%lx\n", func_addr);
