@@ -2,7 +2,6 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/kprobes.h>
-
 static struct kprobe kp = {
     .symbol_name = "kallsyms_lookup_name"
 };
