@@ -16,7 +16,7 @@ static int __init hello_init(void)
     kallsyms_lookup_name = (kallsyms_lookup_name_t) kp.addr;
     unregister_kprobe(&kp);
 
-    char *func_addr = (char *)kallsyms_lookup_name("__do_sys_fork");
+    char *func_addr = (char *)kallsyms_lookup_name("schedule");
 
     for (i = 0; i < 5; i++)
     {
