@@ -8,6 +8,10 @@ categories:
 comments: true
 ---
 
+为及时得到更新可以关注公众号  head_first_bpf 或者深入浅出 ebpf 网站 <https://ebpf.top>
+
+![img](head_first_bpf.png)
+
 # eBPF 技术简介
 <img src="imgs/linux-bpf-book.jpeg" style="zoom:50%;" />
 
